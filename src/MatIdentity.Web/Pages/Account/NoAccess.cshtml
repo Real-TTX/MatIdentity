@@ -1,0 +1,21 @@
+@page
+@model MatIdentity.Web.Pages.Account.NoAccessModel
+@{
+    Layout = "_Bare";
+    ViewData["Title"] = "No access";
+}
+
+<div class="mat-auth__card">
+    <div class="mat-auth__brand">
+        @Ui.Logo("lg")
+        <h1>No access to @Model.AppName</h1>
+        <p class="mat-muted">You are signed in as @User.GetDisplayName(), but @Model.AppName was not given to you. Ask an administrator to give it to you or to one of your groups.</p>
+    </div>
+    <div class="mat-btn-row mat-btn-row--plain">
+        <a href="/" class="mat-btn mat-btn--primary"><icon name="home" /><span>Your apps</span></a>
+        <form method="post" action="/Account/Logout">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="mat-btn mat-btn--secondary"><icon name="logout" /><span>Sign in as someone else</span></button>
+        </form>
+    </div>
+</div>

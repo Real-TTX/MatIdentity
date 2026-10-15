@@ -164,7 +164,7 @@ public sealed class OidcFlowTests
     /// <summary>Registers an app through the client API (as Mattiverse does) and returns its secret.</summary>
     private async Task<string> RegisterAsync(string id, bool allowSignIn, bool allowMachine)
     {
-        var body = new { displayName = id, allowSignIn, allowMachine, redirectUris = allowSignIn ? new[] { Redirect } : Array.Empty<string>(), managedBy = "tests" };
+        var body = new { displayName = id, allowSignIn, allowMachine, callsAllApps = allowMachine, redirectUris = allowSignIn ? new[] { Redirect } : Array.Empty<string>(), managedBy = "tests" };
         var response = await _site.Api().PutAsJsonAsync($"/api/v1/clients/{id}", body);
         var text = await response.Content.ReadAsStringAsync();
         Assert.True(response.IsSuccessStatusCode, text);

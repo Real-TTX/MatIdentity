@@ -44,6 +44,21 @@
                     <span class="mat-error"></span>
                 </div>
 
+                @if (Model.AllGroups.Count > 0)
+                {
+                    <fieldset class="mat-field mat-fieldset mat-field--full">
+                        <legend class="mat-label">Groups</legend>
+                        @foreach (var g in Model.AllGroups)
+                        {
+                            <label class="mat-check">
+                                <input type="checkbox" name="Input.GroupIds" value="@g.Id" checked="@Model.Input.GroupIds.Contains(g.Id)" />
+                                <span class="mat-check__text">@g.Name</span>
+                            </label>
+                        }
+                        <span class="mat-hint">A group gets apps and roles for all its people at once.</span>
+                    </fieldset>
+                }
+
                 <mat-field label="Password" asp-for="Input.Password" required="@(!Model.IsEdit)" hint="@pwHint">
                     <input asp-for="Input.Password" type="password" class="mat-input" autocomplete="new-password" />
                 </mat-field>

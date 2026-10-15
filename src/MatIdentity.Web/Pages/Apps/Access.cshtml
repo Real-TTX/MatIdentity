@@ -1,0 +1,156 @@
+@page
+@model MatIdentity.Web.Pages.Apps.AccessModel
+@{
+    ViewData["Title"] = Model.App.DisplayName;
+    ViewData["PageSub"] = "Who may sign in, and with which role.";
+    ViewData["Crumbs"] = Crumbs.Of(("Apps", "/Apps"), (Model.App.DisplayName, "/Apps/Edit?id=" + Model.Id), ("Access", null));
+    ViewData["Width"] = "narrow";
+    var byMatIdentity = Model.Policy.RoleMode == RoleMode.MatIdentity;
+}
+
+<tab-bar model="Model.Tabs" label="@Model.App.DisplayName" />
+
+@if (!Model.App.AllowSignIn)
+{
+    <div class="mat-alert mat-alert--info" role="status"><icon name="info" /><div class="mat-alert__body">People do not sign in to this app (it only calls other apps), so these rules have no effect.</div></div>
+}
+
+<form method="post" asp-page-handler="Rules" class="mat-form" novalidate>
+    <div class="mat-card">
+        <div class="mat-card__head"><icon name="shield" /><span class="mat-card__title">Rules</span></div>
+        <div class="mat-card__body mat-stack">
+            <fieldset class="mat-field mat-fieldset">
+                <legend class="mat-label">Who decides the roles</legend>
+                <div class="mat-options">
+                    <label class="mat-option"><input type="radio" id="mode-mi" name="RoleMode" value="MatIdentity" checked="@(Model.RoleMode == RoleMode.MatIdentity)" /><span>Admin: MatIdentity gives the roles, the app follows</span></label>
+                    <label class="mat-option"><input type="radio" id="mode-app" name="RoleMode" value="App" checked="@(Model.RoleMode == RoleMode.App)" /><span>Managed by the app: MatIdentity only lets people in</span></label>
+                </div>
+                <span class="mat-hint">With "Managed by the app" the token carries no role; the app gives rights itself.</span>
+            </fieldset>
+            <label class="mat-check">
+                <input type="checkbox" name="OpenToEveryone" value="true" checked="@Model.OpenToEveryone" />
+                <span class="mat-check__text">Everyone may sign in (with the last role), not only the people and groups below</span>
+            </label>
+            <div class="mat-btn-row mat-btn-row--plain">
+                <button type="submit" class="mat-btn mat-btn--primary"><icon name="save" /><span>Save</span></button>
+            </div>
+        </div>
+    </div>
+</form>
+
+<div class="mat-card">
+    <div class="mat-card__head"><icon name="users" /><span class="mat-card__title">People and groups</span></div>
+    <div class="mat-card__body mat-stack">
+        <p class="mat-muted">Administrators of MatIdentity may always sign in. @(Model.Policy.OpenToEveryone ? "Everyone else may too; the roles below are what changes." : "Everyone else needs to be here, or in a group that is.")</p>
+        @if (Model.Grants.Count > 0)
+        {
+            <div class="mat-table-wrap">
+                <table class="mat-table">
+                    <caption class="mat-sr-only">Who may sign in</caption>
+                    <thead>
+                        <tr><th scope="col">Who</th>@if (byMatIdentity) { <th scope="col">Role</th> }<th scope="col"><span class="mat-sr-only">Actions</span></th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var g in Model.Grants)
+                        {
+                            <tr>
+                                <td data-label="Who">
+                                    @if (g.Group is not null)
+                                    {
+                                        <span class="mat-table__name"><icon name="layers" /> @g.Group.Name</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="mat-table__name">@g.User!.DisplayName</span> <span class="mat-muted">@g.User.Username</span>
+                                    }
+                                </td>
+                                @if (byMatIdentity)
+                                {
+                                    <td data-label="Role">
+                                        <form method="post" asp-page-handler="ChangeRole" data-autosubmit>
+                                            <input type="hidden" name="grantId" value="@g.Id" />
+                                            <select class="mat-select" name="role" aria-label="Role of @(g.Group?.Name ?? g.User!.DisplayName)">
+                                                <option value="">Default (@Model.Roles[^1].Label)</option>
+                                                @foreach (var r in Model.Roles)
+                                                {
+                                                    <option value="@r.Key" selected="@(g.RoleKey == r.Key)">@r.Label</option>
+                                                }
+                                            </select>
+                                        </form>
+                                    </td>
+                                }
+                                <td class="mat-table__cell-actions">
+                                    <div class="mat-table__actions">
+                                        <form method="post" asp-page-handler="Revoke" data-confirm="Take @Model.App.DisplayName away from @(g.Group?.Name ?? g.User!.DisplayName)?" data-confirm-ok="Take away" data-confirm-danger>
+                                            <input type="hidden" name="grantId" value="@g.Id" />
+                                            <button type="submit" class="mat-btn mat-btn--danger mat-btn--icon mat-btn--sm" aria-label="Take away from @(g.Group?.Name ?? g.User!.DisplayName)" data-tip="Take away"><icon name="trash" /></button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <p class="mat-hint">Not given to anyone yet.</p>
+        }
+
+        @if (Model.Candidates.Count > 0)
+        {
+            <form method="post" asp-page-handler="Grant" class="mat-form" novalidate>
+                <div class="mat-form__grid">
+                    <mat-field label="Give it to" for-id="grant-who">
+                        <select class="mat-select" id="grant-who" name="principal" required data-msg-required="Choose a person or a group.">
+                            <option value="">Choose…</option>
+                            @foreach (var (value, label) in Model.Candidates)
+                            {
+                                <option value="@value">@label</option>
+                            }
+                        </select>
+                    </mat-field>
+                    @if (byMatIdentity)
+                    {
+                        <mat-field label="Role" for-id="grant-role">
+                            <select class="mat-select" id="grant-role" name="role">
+                                <option value="">Default (@Model.Roles[^1].Label)</option>
+                                @foreach (var r in Model.Roles)
+                                {
+                                    <option value="@r.Key">@r.Label</option>
+                                }
+                            </select>
+                        </mat-field>
+                    }
+                </div>
+                <div class="mat-btn-row mat-btn-row--plain">
+                    <button type="submit" class="mat-btn mat-btn--primary"><icon name="plus" /><span>Give</span></button>
+                </div>
+            </form>
+        }
+    </div>
+</div>
+
+@if (byMatIdentity)
+{
+    <form method="post" asp-page-handler="Roles" class="mat-form" novalidate>
+        <partial name="_ValidationSummary" />
+        <div class="mat-card">
+            <div class="mat-card__head"><icon name="key" /><span class="mat-card__title">Roles of the app</span></div>
+            <div class="mat-card__body mat-stack">
+                <p class="mat-muted">@(Model.HasOwnRoles ? "The roles this app knows, the most powerful first." : "The app has not said which roles it knows; until then these two are used.") The key goes into the token as <span class="mat-mono">role</span>.</p>
+                <mat-field label="One role per line: key, then the name" asp-for="RolesText">
+                    <textarea asp-for="RolesText" class="mat-textarea mat-mono" rows="4"></textarea>
+                </mat-field>
+                <div class="mat-btn-row mat-btn-row--plain">
+                    <button type="submit" class="mat-btn mat-btn--primary"><icon name="save" /><span>Save roles</span></button>
+                    @if (!string.IsNullOrEmpty(Model.App.HomeUrl))
+                    {
+                        <button type="submit" class="mat-btn mat-btn--secondary" asp-page-handler="ReadRoles" formnovalidate><icon name="refresh" /><span>Read from the app</span></button>
+                    }
+                </div>
+            </div>
+        </div>
+    </form>
+}

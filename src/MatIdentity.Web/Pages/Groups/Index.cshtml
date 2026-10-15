@@ -1,0 +1,67 @@
+@page
+@model MatIdentity.Web.Pages.Groups.IndexModel
+@{
+    ViewData["Title"] = "Groups";
+    ViewData["PageSub"] = "Give apps and roles to a group instead of to each person.";
+    ViewData["Crumbs"] = Crumbs.Of(("Groups", null));
+    var list = Model.List;
+}
+
+<div class="mat-list">
+    <partial name="_Toolbar" model="list.Toolbar" />
+
+    @if (list.Items.Count == 0)
+    {
+        <div class="mat-empty">
+            <span class="mat-empty__icon"><icon name="users" /></span>
+            @if (list.Filtered)
+            {
+                <div class="mat-empty__title">Nothing matches</div>
+                <p>No group matches. Change the search.</p>
+                <a class="mat-btn mat-btn--secondary" href="/Groups">Reset the tools</a>
+            }
+            else
+            {
+                <div class="mat-empty__title">No groups yet</div>
+                <p>A group like Family or Guests gets apps and roles for all its people at once.</p>
+                <a class="mat-btn mat-btn--primary" href="/Groups/Edit"><icon name="plus" /><span>New group</span></a>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="mat-table-wrap">
+            <table class="mat-table">
+                <caption class="mat-sr-only">Groups</caption>
+                <thead>
+                    <tr><th scope="col">Group</th><th scope="col" class="mat-hide-sm">Description</th><th scope="col">People</th><th scope="col"><span class="mat-sr-only">Actions</span></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var (g, members) in list.Items)
+                    {
+                        <tr>
+                            <td data-label="Group"><div class="mat-table__name"><a href="/Groups/Edit?id=@g.Id">@g.Name</a></div></td>
+                            <td data-label="Description" class="mat-hide-sm mat-muted">@(g.Description ?? "–")</td>
+                            <td data-label="People">@members</td>
+                            <td class="mat-table__cell-actions">
+                                <div class="mat-table__actions">
+                                    <a class="mat-btn mat-btn--ghost mat-btn--icon mat-btn--sm" href="/Groups/Edit?id=@g.Id" aria-label="Edit @g.Name" data-tip="Edit"><icon name="edit" /></a>
+                                    <form method="post" asp-page-handler="Delete" data-confirm="Delete the group @g.Name? Its people lose what was given to the group." data-confirm-ok="Delete" data-confirm-danger>
+                                        <input type="hidden" name="id" value="@g.Id" />
+                                        <button type="submit" class="mat-btn mat-btn--danger mat-btn--icon mat-btn--sm" aria-label="Delete @g.Name" data-tip="Delete"><icon name="trash" /></button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    <partial name="_Pager" model="list.Pager" />
+
+    <div class="mat-actions">
+        <a href="/Groups/Edit" class="mat-btn mat-btn--primary"><icon name="plus" /><span>New group</span></a>
+    </div>
+</div>

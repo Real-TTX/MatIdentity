@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text.Json;
+using MatIdentity.Core.Access;
 using OpenIddict.Abstractions;
 using static OpenIddict.Abstractions.OpenIddictConstants;
 
@@ -8,7 +9,7 @@ namespace MatIdentity.Core.Clients;
 /// <summary>
 /// The apps (OpenID Connect clients) of MatIdentity: list, create, change, renew the secret, remove. Stores them through OpenIddict and keeps,
 /// for every app, its scope <c>app:&lt;id&gt;</c> whose audience is the app, so another app can ask for a token to call it (docs/PLATFORM.md,
-/// "Apps talking to each other"). An app that may call others gets the scopes of all apps, also of those added later.
+/// "Apps talking to each other"). Which apps an app may call is its rule in <see cref="PermissionService"/>: all (also those added later) or the ones given to it.
 /// </summary>
 public sealed class ClientService
 {
@@ -18,11 +19,13 @@ public sealed class ClientService
 
     private readonly IOpenIddictApplicationManager _applications;
     private readonly IOpenIddictScopeManager _scopes;
+    private readonly PermissionService _permissions;
 
-    public ClientService(IOpenIddictApplicationManager applications, IOpenIddictScopeManager scopes)
+    public ClientService(IOpenIddictApplicationManager applications, IOpenIddictScopeManager scopes, PermissionService permissions)
     {
         _applications = applications;
         _scopes = scopes;
+        _permissions = permissions;
     }
 
     public async Task<List<ClientInfo>> GetAllAsync(CancellationToken ct = default)
@@ -115,7 +118,7 @@ public sealed class ClientService
         {
             descriptor.Permissions.Add(Permissions.Endpoints.Token);
             descriptor.Permissions.Add(Permissions.GrantTypes.ClientCredentials);
-            foreach (var scope in await AppScopeNamesAsync(ct))
+            foreach (var scope in await MachineScopesAsync(client.ClientId, ct))
             {
                 descriptor.Permissions.Add(Permissions.Prefixes.Scope + scope);
             }
@@ -142,8 +145,8 @@ public sealed class ClientService
         if (existing is null)
         {
             await _applications.CreateAsync(descriptor, ct);
-            // Every app that may call other apps may call this new one too.
-            await GrantNewScopeToMachinesAsync(ClientRules.AppScope(client.ClientId), ct);
+            // Every app that may call all apps may call this new one too.
+            await SyncAllCallersAsync(ct);
         }
         else
         {
@@ -180,6 +183,7 @@ public sealed class ClientService
         }
 
         await _applications.DeleteAsync(app, ct);
+        await _permissions.RemoveAppAsync(clientId, ct);
         if (await _scopes.FindByNameAsync(ClientRules.AppScope(clientId), ct) is { } scope)
         {
             await _scopes.DeleteAsync(scope, ct);
@@ -221,25 +225,57 @@ public sealed class ClientService
         return names;
     }
 
-    private async Task GrantNewScopeToMachinesAsync(string scope, CancellationToken ct)
+    /// <summary>The scopes an app may ask for with client credentials: of every app when it calls all, else of the apps given to it (and only those that exist).</summary>
+    public async Task<List<string>> MachineScopesAsync(string clientId, CancellationToken ct = default)
     {
-        var permission = Permissions.Prefixes.Scope + scope;
-        var machines = new List<object>();
-        await foreach (var app in _applications.ListAsync(count: null, offset: null, ct))
+        var all = await AppScopeNamesAsync(ct);
+        if ((await _permissions.PolicyAsync(clientId, ct)).CallsAllApps)
         {
-            var permissions = await _applications.GetPermissionsAsync(app, ct);
-            if (permissions.Contains(Permissions.GrantTypes.ClientCredentials) && !permissions.Contains(permission))
+            return all;
+        }
+
+        var wanted = (await _permissions.CallTargetsAsync(clientId, ct)).Select(ClientRules.AppScope).ToHashSet(StringComparer.Ordinal);
+        return all.Where(wanted.Contains).ToList();
+    }
+
+    /// <summary>Writes the scopes an app may ask for into its permissions again (after its call rules changed). Nothing for an app that calls no app.</summary>
+    public async Task SyncCallScopesAsync(string clientId, CancellationToken ct = default)
+    {
+        var app = await _applications.FindByClientIdAsync(clientId, ct);
+        if (app is null)
+        {
+            return;
+        }
+
+        var descriptor = new OpenIddictApplicationDescriptor();
+        await _applications.PopulateAsync(descriptor, app, ct);
+        descriptor.Permissions.RemoveWhere(p => p.StartsWith(Permissions.Prefixes.Scope + ClientRules.AppScopePrefix, StringComparison.Ordinal));
+        if (descriptor.Permissions.Contains(Permissions.GrantTypes.ClientCredentials))
+        {
+            foreach (var scope in await MachineScopesAsync(clientId, ct))
             {
-                machines.Add(app);
+                descriptor.Permissions.Add(Permissions.Prefixes.Scope + scope);
             }
         }
 
-        foreach (var app in machines)
+        await _applications.UpdateAsync(app, descriptor, ct);
+    }
+
+    /// <summary>Brings the scopes of every app that calls all apps up to date (a new app was added).</summary>
+    private async Task SyncAllCallersAsync(CancellationToken ct)
+    {
+        var callers = new List<string>();
+        await foreach (var app in _applications.ListAsync(count: null, offset: null, ct))
         {
-            var descriptor = new OpenIddictApplicationDescriptor();
-            await _applications.PopulateAsync(descriptor, app, ct);
-            descriptor.Permissions.Add(permission);
-            await _applications.UpdateAsync(app, descriptor, ct);
+            if (await _applications.GetClientIdAsync(app, ct) is { } id && (await _permissions.PolicyAsync(id, ct)).CallsAllApps)
+            {
+                callers.Add(id);
+            }
+        }
+
+        foreach (var id in callers)
+        {
+            await SyncCallScopesAsync(id, ct);
         }
     }
 

@@ -1,8 +1,10 @@
 using System.ComponentModel.DataAnnotations;
+using MatIdentity.Core.Access;
 using MatIdentity.Core.Activity;
 using MatIdentity.Core.Clients;
 using MatIdentity.Core.Configuration;
 using MatIdentity.Core.Entities;
+using MatIdentity.Web.Controls;
 using MatIdentity.Web.Support;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -19,9 +21,11 @@ public class EditModel : PageModel
     private readonly ActivityService _activity;
     private readonly SystemConfigService _config;
     private readonly IConfiguration _configuration;
+    private readonly PermissionService _permissions;
 
-    public EditModel(ClientService clients, ActivityService activity, SystemConfigService config, IConfiguration configuration)
+    public EditModel(ClientService clients, ActivityService activity, SystemConfigService config, IConfiguration configuration, PermissionService permissions)
     {
+        _permissions = permissions;
         _clients = clients;
         _activity = activity;
         _config = config;
@@ -43,6 +47,11 @@ public class EditModel : PageModel
     public string AuthorityUrl { get; private set; } = string.Empty;
 
     public string? ManagedBy { get; private set; }
+
+    /// <summary>The other apps, for the choice which of them this one may call.</summary>
+    public IReadOnlyList<ClientInfo> OtherApps { get; private set; } = [];
+
+    public TabBarModel Tabs => AppTabs.For(Id ?? string.Empty, "general", Input.AllowMachine);
 
     [TempData] public string? StatusMessage { get; set; }
     [TempData] public bool IsError { get; set; }
@@ -72,11 +81,18 @@ public class EditModel : PageModel
 
         [Display(Name = "Addresses after sign-out")]
         public string? PostLogoutRedirectUris { get; set; }
+
+        /// <summary>It may call every app, also those added later (Mattiverse).</summary>
+        public bool CallsAllApps { get; set; }
+
+        /// <summary>The apps it may call when it does not call all.</summary>
+        public List<string> CallTargets { get; set; } = [];
     }
 
     public async Task<IActionResult> OnGetAsync()
     {
         AuthorityUrl = await Authority.GetAsync(HttpContext, _config, _configuration);
+        await LoadOtherAppsAsync();
         if (!IsEdit)
         {
             return Page();
@@ -88,13 +104,14 @@ public class EditModel : PageModel
             return NotFound();
         }
 
-        Fill(client);
+        await FillAsync(client);
         return Page();
     }
 
     public async Task<IActionResult> OnPostAsync()
     {
         AuthorityUrl = await Authority.GetAsync(HttpContext, _config, _configuration);
+        await LoadOtherAppsAsync();
         var existing = IsEdit ? await _clients.GetAsync(Id!, HttpContext.RequestAborted) : null;
         if (IsEdit && existing is null)
         {
@@ -110,6 +127,16 @@ public class EditModel : PageModel
         {
             ManagedBy = existing?.ManagedBy;
             return Page();
+        }
+
+        // The call rules first: saving the app writes the scopes it may ask for from them.
+        var clientId = existing?.ClientId ?? Input.ClientId.Trim();
+        if (ClientRules.IsValidClientId(clientId))
+        {
+            var policy = await _permissions.PolicyAsync(clientId, HttpContext.RequestAborted);
+            await _permissions.SavePolicyAsync(clientId, policy.RoleMode, policy.OpenToEveryone, Input.AllowMachine && Input.CallsAllApps, HttpContext.RequestAborted);
+            var known = OtherApps.Select(a => a.ClientId).ToHashSet(StringComparer.Ordinal);
+            await _permissions.SetCallTargetsAsync(clientId, Input.AllowMachine ? Input.CallTargets.Where(known.Contains) : [], HttpContext.RequestAborted);
         }
 
         var result = await _clients.SaveAsync(new ClientInfo
@@ -143,7 +170,7 @@ public class EditModel : PageModel
         {
             // A new app: its secret now, once.
             Id = result.Client.ClientId;
-            Fill(result.Client);
+            await FillAsync(result.Client);
             NewSecret = result.Secret;
             return Page();
         }
@@ -167,7 +194,7 @@ public class EditModel : PageModel
         await _activity.WriteAsync(ActivityKind.ClientSecretRenewed, username: User.GetUsername(), clientId: client.ClientId,
             ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString(), ct: HttpContext.RequestAborted);
         ModelState.Clear();
-        Fill(client);
+        await FillAsync(client);
         NewSecret = secret;
         return Page();
     }
@@ -176,11 +203,16 @@ public class EditModel : PageModel
     public static string SuggestedRedirect(string? homeUrl)
         => string.IsNullOrWhiteSpace(homeUrl) ? "https://app.example.com/signin-oidc" : homeUrl.TrimEnd('/') + "/signin-oidc";
 
-    private void Fill(ClientInfo client)
+    private async Task LoadOtherAppsAsync()
+        => OtherApps = (await _clients.GetAllAsync(HttpContext.RequestAborted)).Where(a => a.ClientId != Id).ToList();
+
+    private async Task FillAsync(ClientInfo client)
     {
         ManagedBy = client.ManagedBy;
         Input = new InputModel
         {
+            CallsAllApps = (await _permissions.PolicyAsync(client.ClientId, HttpContext.RequestAborted)).CallsAllApps,
+            CallTargets = await _permissions.CallTargetsAsync(client.ClientId, HttpContext.RequestAborted),
             ClientId = client.ClientId,
             DisplayName = client.DisplayName,
             HomeUrl = client.HomeUrl,

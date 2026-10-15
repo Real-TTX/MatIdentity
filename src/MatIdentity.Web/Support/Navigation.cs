@@ -85,6 +85,7 @@ public static class Navigation
         {
             items.Add(new("Apps", "/Apps", "apps"));
             items.Add(new("People", "/Users", "users"));
+            items.Add(new("Groups", "/Groups", "layers"));
             items.Add(new("Activity", "/Activity", "activity", failedSignIns > 0 ? NavBadge.Count(failedSignIns, "warn", failedSignIns == 1 ? "failed sign-in" : "failed sign-ins") : null));
             items.Add(new("Settings", "/Settings", "settings"));
         }

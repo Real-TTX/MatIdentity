@@ -66,6 +66,8 @@ builder.Services.AddSingleton<SetupState>();
 builder.Services.AddSingleton<MatIdentity.Web.Support.Toolkit>();
 builder.Services.AddSingleton<ApiAccess>();
 builder.Services.AddScoped<IMatPlatformApp, IdentityPlatform>();
+builder.Services.AddHttpClient();
+builder.Services.AddScoped<AppRolesReader>();
 builder.Services.AddMatIdentityCore();
 builder.Services.AddMatIdentityRateLimits();
 
@@ -177,7 +179,7 @@ builder.Services.AddRazorPages(options =>
     options.Conventions.AllowAnonymousToPage("/Error");
     options.Conventions.AllowAnonymousToPage("/StatusCode");
 
-    foreach (var folder in new[] { "/Apps", "/Users", "/Activity", "/Settings" })
+    foreach (var folder in new[] { "/Apps", "/Users", "/Groups", "/Activity", "/Settings" })
     {
         options.Conventions.AuthorizeFolder(folder, "AdminOnly");
     }

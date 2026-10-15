@@ -1,0 +1,40 @@
+@page
+@model MatIdentity.Web.Pages.Groups.EditModel
+@{
+    ViewData["Title"] = Model.IsEdit ? "Edit group" : "New group";
+    ViewData["PageSub"] = "Its name and its people. Which apps it may open is set on the page of each app.";
+    ViewData["Crumbs"] = Crumbs.Of(("Groups", "/Groups"), (Model.IsEdit ? Model.Input.Name : "New group", null));
+    ViewData["Width"] = "narrow";
+}
+
+<form method="post" class="mat-form" novalidate>
+    <input type="hidden" asp-for="Input.Id" />
+    <partial name="_ValidationSummary" />
+
+    <div class="mat-card">
+        <div class="mat-card__body mat-stack">
+            <mat-field label="Name" asp-for="Input.Name" required="true">
+                <input asp-for="Input.Name" class="mat-input" required maxlength="100" placeholder="Family" data-msg-required="Please enter a name." />
+            </mat-field>
+            <mat-field label="Description" asp-for="Input.Description" hint="Optional.">
+                <input asp-for="Input.Description" class="mat-input" maxlength="500" />
+            </mat-field>
+            <fieldset class="mat-field mat-fieldset">
+                <legend class="mat-label">People</legend>
+                @foreach (var p in Model.People)
+                {
+                    <label class="mat-check">
+                        <input type="checkbox" name="Input.MemberIds" value="@p.Id" checked="@Model.Input.MemberIds.Contains(p.Id)" />
+                        <span class="mat-check__text">@p.DisplayName <span class="mat-muted">(@p.Username)</span></span>
+                    </label>
+                }
+                <span class="mat-error"></span>
+            </fieldset>
+        </div>
+    </div>
+
+    <div class="mat-btn-row">
+        <button type="submit" class="mat-btn mat-btn--primary"><icon name="save" /><span>Save</span></button>
+        <a href="/Groups" class="mat-btn mat-btn--secondary"><icon name="back" /><span>Back</span></a>
+    </div>
+</form>

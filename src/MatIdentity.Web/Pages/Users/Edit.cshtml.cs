@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using MatIdentity.Core.Access;
 using MatIdentity.Core.Auth;
 using MatIdentity.Core.Clients;
 using MatIdentity.Core.Entities;
@@ -17,9 +18,11 @@ public class EditModel : PageModel
     private readonly UserService _userService;
     private readonly SessionService _sessions;
     private readonly TokenRevoker _revoker;
+    private readonly GroupService _groups;
 
-    public EditModel(UserService userService, SessionService sessions, TokenRevoker revoker)
+    public EditModel(UserService userService, SessionService sessions, TokenRevoker revoker, GroupService groups)
     {
+        _groups = groups;
         _userService = userService;
         _sessions = sessions;
         _revoker = revoker;
@@ -29,6 +32,9 @@ public class EditModel : PageModel
     public InputModel Input { get; set; } = new();
 
     public bool IsEdit => Input.Id is > 0;
+
+    /// <summary>Every group, for the checkboxes.</summary>
+    public IReadOnlyList<Group> AllGroups { get; private set; } = [];
 
     [TempData] public string? StatusMessage { get; set; }
     [TempData] public bool IsError { get; set; }
@@ -67,10 +73,13 @@ public class EditModel : PageModel
         [Compare(nameof(Password), ErrorMessage = "The passwords do not match.")]
         [Display(Name = "Confirm password")]
         public string? ConfirmPassword { get; set; }
+
+        public List<long> GroupIds { get; set; } = [];
     }
 
     public async Task<IActionResult> OnGetAsync(long? id)
     {
+        AllGroups = (await _groups.GetAllAsync(HttpContext.RequestAborted)).Select(g => g.Group).ToList();
         if (id is > 0)
         {
             var user = await _userService.GetAsync(id.Value, HttpContext.RequestAborted);
@@ -86,7 +95,8 @@ public class EditModel : PageModel
                 DisplayName = user.DisplayName,
                 Email = user.Email,
                 Role = user.Role,
-                IsActive = user.IsActive
+                IsActive = user.IsActive,
+                GroupIds = await _groups.GroupIdsOfAsync(user.Id, HttpContext.RequestAborted),
             };
         }
 
@@ -96,6 +106,7 @@ public class EditModel : PageModel
     public async Task<IActionResult> OnPostAsync()
     {
         var ct = HttpContext.RequestAborted;
+        AllGroups = (await _groups.GetAllAsync(ct)).Select(g => g.Group).ToList();
         if (!IsEdit && string.IsNullOrEmpty(Input.Password))
         {
             ModelState.AddModelError("Input.Password", "Please set a password.");
@@ -139,6 +150,7 @@ public class EditModel : PageModel
         if (existing is not null)
         {
             await _userService.UpdateAsync(existing.Id, displayName, Input.Email, Input.Role, Input.IsActive, Input.Password, ct);
+            await _groups.SetGroupsOfAsync(existing.Id, Input.GroupIds, ct);
 
             // A disabled account or a password set by an administrator: out everywhere.
             if (!Input.IsActive || !string.IsNullOrEmpty(Input.Password))
@@ -157,7 +169,8 @@ public class EditModel : PageModel
                 return Page();
             }
 
-            await _userService.CreateAsync(Input.Username, displayName, Input.Email, Input.Password!, Input.Role, mustChangePassword: false, ct);
+            var created = await _userService.CreateAsync(Input.Username, displayName, Input.Email, Input.Password!, Input.Role, mustChangePassword: false, ct);
+            await _groups.SetGroupsOfAsync(created.Id, Input.GroupIds, ct);
             StatusMessage = "Person created.";
         }
 

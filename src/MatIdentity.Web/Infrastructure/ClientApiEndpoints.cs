@@ -1,3 +1,4 @@
+using MatIdentity.Core.Access;
 using MatIdentity.Core.Activity;
 using MatIdentity.Core.Clients;
 using MatIdentity.Core.Entities;
@@ -12,7 +13,8 @@ namespace MatIdentity.Web.Infrastructure;
 /// <code>
 /// GET    /api/v1/clients                     the apps (never a secret)
 /// GET    /api/v1/clients/{clientId}
-/// PUT    /api/v1/clients/{clientId}          { displayName, homeUrl, redirectUris, postLogoutRedirectUris, allowSignIn, allowMachine, isPublic, managedBy, renewSecret }
+/// PUT    /api/v1/clients/{clientId}          { displayName, homeUrl, redirectUris, postLogoutRedirectUris, allowSignIn, allowMachine, isPublic, managedBy, renewSecret,
+///                                              roleMode: "matidentity" or "app", roles: [{ key, label }], openToEveryone, callsAllApps }
 ///                                            200 { client, clientSecret? }: the secret only when it was made now (a new app, or renewSecret: true)
 /// DELETE /api/v1/clients/{clientId}?managedBy=mattiverse   204, 404, or 409 when the app carries another mark
 /// </code>
@@ -29,9 +31,35 @@ public static class ClientApiEndpoints
         api.MapGet("/{clientId}", async (string clientId, ClientService clients, CancellationToken ct) =>
             await clients.GetAsync(clientId, ct) is { } client ? Results.Json(client, options) : NotFound(clientId));
 
-        api.MapPut("/{clientId}", async (string clientId, ClientBody body, HttpContext http, ClientService clients, ActivityService activity, CancellationToken ct) =>
+        api.MapPut("/{clientId}", async (string clientId, ClientBody body, HttpContext http, ClientService clients, PermissionService permissions, ActivityService activity, CancellationToken ct) =>
         {
             var existing = await clients.GetAsync(clientId, ct);
+
+            // The rules first (the app's scopes are written from them when it is saved); the roles are checked before anything is saved.
+            var roles = body.Roles?.Select(r => new RoleInfo(r.Key ?? string.Empty, r.Label ?? r.Key ?? string.Empty)).ToList();
+            var roleErrors = roles is null ? new Dictionary<string, string>() : PermissionService.ValidateRoles(roles);
+            var roleMode = body.RoleMode switch { "app" => RoleMode.App, "matidentity" => RoleMode.MatIdentity, _ => (RoleMode?)null };
+            if (body.RoleMode is not null && roleMode is null)
+            {
+                roleErrors["roleMode"] = "Use \"matidentity\" or \"app\".";
+            }
+
+            if (roleErrors.Count > 0 || !ClientRules.IsValidClientId(clientId))
+            {
+                if (!ClientRules.IsValidClientId(clientId))
+                {
+                    roleErrors["clientId"] = "Use 2 to 63 small letters, digits, - or _, starting with a letter or digit.";
+                }
+
+                return Results.Json(new { errors = roleErrors }, options, statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            var policy = await permissions.PolicyAsync(clientId, ct);
+            await permissions.SavePolicyAsync(clientId, roleMode ?? policy.RoleMode, body.OpenToEveryone ?? policy.OpenToEveryone, body.CallsAllApps ?? policy.CallsAllApps, ct);
+            if (roles is not null)
+            {
+                await permissions.SaveRolesAsync(clientId, roles, ct);
+            }
             var input = new ClientInfo
             {
                 ClientId = clientId,
@@ -54,7 +82,16 @@ public static class ClientApiEndpoints
             var caller = http.Items[ApiAccess.CallerKey] as string;
             await activity.WriteAsync(existing is null ? ActivityKind.ClientCreated : result.Secret is null ? ActivityKind.ClientChanged : ActivityKind.ClientSecretRenewed,
                 username: caller, clientId: clientId, ipAddress: http.Connection.RemoteIpAddress?.ToString(), detail: "Through the API", ct: ct);
-            return Results.Json(new { client = result.Client, clientSecret = result.Secret }, options);
+            var saved = await permissions.PolicyAsync(clientId, ct);
+            return Results.Json(new
+            {
+                client = result.Client,
+                clientSecret = result.Secret,
+                roleMode = saved.RoleMode == RoleMode.App ? "app" : "matidentity",
+                roles = await permissions.RolesAsync(clientId, ct),
+                saved.OpenToEveryone,
+                saved.CallsAllApps,
+            }, options);
         });
 
         api.MapDelete("/{clientId}", async (string clientId, string? managedBy, HttpContext http, ClientService clients, ActivityService activity, CancellationToken ct) =>
@@ -91,5 +128,11 @@ public static class ClientApiEndpoints
         bool? AllowMachine,
         bool? IsPublic,
         string? ManagedBy,
-        bool? RenewSecret);
+        bool? RenewSecret,
+        string? RoleMode,
+        IReadOnlyList<RoleBody>? Roles,
+        bool? OpenToEveryone,
+        bool? CallsAllApps);
+
+    public sealed record RoleBody(string? Key, string? Label);
 }

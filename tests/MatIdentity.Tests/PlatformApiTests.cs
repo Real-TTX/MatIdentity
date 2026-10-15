@@ -161,7 +161,8 @@ public sealed partial class PlatformApiTests
         Assert.StartsWith("/Account/Login", home.Headers.Location!.PathAndQuery.TrimStart());
 
         await IdentityFactory.SignInAsync(browser, "/Account/Login?returnUrl=%2FApps");
-        foreach (var page in new[] { "/", "/Apps", "/Apps/Edit", "/Users", "/Users/Edit", "/Activity", "/Settings", "/Account/Profile", "/Account/Profile?tab=password", "/Account/Profile?tab=sessions" })
+        await _site.Api().PutAsJsonAsync("/api/v1/clients/matpages", new { displayName = "Pages", redirectUris = new[] { "https://pages.test/signin-oidc" } });
+        foreach (var page in new[] { "/", "/Apps", "/Apps/Edit", "/Apps/Edit?id=matpages", "/Apps/Access?id=matpages", "/Users", "/Users/Edit", "/Groups", "/Groups/Edit", "/Activity", "/Settings", "/Account/Profile", "/Account/Profile?tab=password", "/Account/Profile?tab=sessions", "/Account/NoAccess?app=matpages" })
         {
             var response = await browser.GetAsync(page);
             Assert.True(response.StatusCode == HttpStatusCode.OK, $"{page}: {(int)response.StatusCode}");

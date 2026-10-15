@@ -29,6 +29,9 @@ public sealed record MatApiDefinition
 
     public IReadOnlyList<MatCapability> Consumes { get; init; } = [];
 
+    /// <summary>The roles of the app, the most powerful first; MatIdentity offers them when an administrator gives the app to people (null: the app has none to offer).</summary>
+    public IReadOnlyList<MatRole>? Roles { get; init; }
+
     /// <summary>The paths the app implements (for the list in <c>GET /api</c>).</summary>
     public IReadOnlyList<string> Endpoints { get; init; } = [];
 
@@ -90,6 +93,9 @@ public sealed record MatAction(string Id, string Label, string Icon, string Kind
 }
 
 public sealed record MatCapability(string Capability, int Version, bool? Optional = null);
+
+/// <summary>A role of the app: the value of the claim <c>role</c> and its name for people.</summary>
+public sealed record MatRole(string Key, string Label);
 
 /// <summary>A value of <c>GET /api/state</c>. The value is always written, also when it is null (a time that has not happened yet).</summary>
 public sealed record MatStateValue([property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] object? Value, string? Level = null, string? Text = null);

@@ -60,3 +60,6 @@
   .mi-hue-10 { background: oklch(from var(--mat-accent) l c calc(h + 300)); }
   .mi-hue-11 { background: oklch(from var(--mat-accent) l c calc(h + 330)); }
 }
+
+/* A choice that belongs to the check above it (the apps an app may call). */
+.mi-indent { padding-left: var(--mat-space-6); }

@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Security.Claims;
+using MatIdentity.Core.Access;
 using MatIdentity.Core.Activity;
 using MatIdentity.Core.Auth;
 using MatIdentity.Core.Entities;
@@ -28,7 +29,7 @@ public static class OidcEndpoints
         app.MapMethods("/connect/logout", [HttpMethods.Get, HttpMethods.Post], LogoutAsync).AllowAnonymous().DisableAntiforgery();
     }
 
-    private static async Task<IResult> AuthorizeAsync(HttpContext http, UserService users, ActivityService activity)
+    private static async Task<IResult> AuthorizeAsync(HttpContext http, UserService users, ActivityService activity, PermissionService permissions)
     {
         var request = http.GetOpenIddictServerRequest() ?? throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
         var cookie = await http.AuthenticateAsync(AuthConstants.CookieScheme);
@@ -50,7 +51,15 @@ public static class OidcEndpoints
             return Results.Redirect("/Account/Login?returnUrl=" + Uri.EscapeDataString(returnUrl) + (forceLogin ? "&force=true" : string.Empty));
         }
 
-        var identity = BuildIdentity(user, request.GetScopes());
+        // May this person use this app at all, and with which role? (PermissionService: administrators, grants, groups, open to everyone.)
+        var decision = await permissions.DecideAsync(user, request.ClientId ?? string.Empty, http.RequestAborted);
+        if (!decision.Allowed)
+        {
+            await activity.WriteAsync(ActivityKind.AccessDenied, user, clientId: request.ClientId, ipAddress: http.Connection.RemoteIpAddress?.ToString(), detail: decision.Reason, ct: http.RequestAborted);
+            return Results.Redirect("/Account/NoAccess?app=" + Uri.EscapeDataString(request.ClientId ?? string.Empty));
+        }
+
+        var identity = BuildIdentity(user, request.GetScopes(), decision.Role);
         // The access token of a person is meant for the app that asked for it (its own API checks the audience).
         identity.SetResources(request.ClientId ?? string.Empty);
         identity.SetDestinations(Destinations);
@@ -59,7 +68,7 @@ public static class OidcEndpoints
         return Results.SignIn(new ClaimsPrincipal(identity), properties: null, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
     }
 
-    private static async Task<IResult> TokenAsync(HttpContext http, UserService users, ActivityService activity, IOpenIddictApplicationManager applications, IOpenIddictScopeManager scopes)
+    private static async Task<IResult> TokenAsync(HttpContext http, UserService users, ActivityService activity, PermissionService permissions, IOpenIddictApplicationManager applications, IOpenIddictScopeManager scopes)
     {
         var request = http.GetOpenIddictServerRequest() ?? throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
 
@@ -102,7 +111,14 @@ public static class OidcEndpoints
                 return Forbid(Errors.InvalidGrant, "The account no longer exists or is disabled.");
             }
 
-            var identity = BuildIdentity(user, result.Principal.GetScopes());
+            // The rules of the app are asked again: access taken away or a new role take effect at the next renewal.
+            var decision = await permissions.DecideAsync(user, request.ClientId ?? string.Empty, http.RequestAborted);
+            if (!decision.Allowed)
+            {
+                return Forbid(Errors.InvalidGrant, "The app is no longer given to this person.");
+            }
+
+            var identity = BuildIdentity(user, result.Principal.GetScopes(), decision.Role);
             identity.SetResources(result.Principal.GetResources());
             identity.SetDestinations(Destinations);
             return Results.SignIn(new ClaimsPrincipal(identity), properties: null, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
@@ -142,7 +158,11 @@ public static class OidcEndpoints
 
         if (result.Principal.HasScope(Scopes.Roles))
         {
-            claims[Claims.Role] = RoleClaim(user.Role);
+            // The role of the app, as it is in the access token (none when the app decides the roles itself).
+            if (result.Principal.GetClaim(Claims.Role) is { } role)
+            {
+                claims[Claims.Role] = role;
+            }
         }
 
         return Results.Ok(claims);
@@ -169,20 +189,21 @@ public static class OidcEndpoints
     }
 
     /// <summary>The claims of a person, by the scopes the app asked for (<c>sub</c> always).</summary>
-    internal static ClaimsIdentity BuildIdentity(User user, ImmutableArray<string> scopes)
+    internal static ClaimsIdentity BuildIdentity(User user, ImmutableArray<string> scopes, string? appRole)
     {
         var identity = new ClaimsIdentity(TokenValidationParameters.DefaultAuthenticationType, Claims.Name, Claims.Role);
         identity.SetClaim(Claims.Subject, user.Subject)
             .SetClaim(Claims.Name, user.DisplayName)
             .SetClaim(Claims.PreferredUsername, user.Username)
-            .SetClaim(Claims.Email, user.Email)
-            .SetClaims(Claims.Role, [RoleClaim(user.Role)]);
+            .SetClaim(Claims.Email, user.Email);
+        if (appRole is not null)
+        {
+            identity.SetClaims(Claims.Role, [appRole]);
+        }
+
         identity.SetScopes(scopes);
         return identity;
     }
-
-    /// <summary>The value of the claim <c>role</c>: <c>admin</c> or <c>user</c> (docs/PLATFORM.md).</summary>
-    internal static string RoleClaim(UserRole role) => role == UserRole.Admin ? "admin" : "user";
 
     /// <summary>Which token a claim goes into: only what the scopes allow, and the identity token gets the profile only when it was asked for.</summary>
     internal static IEnumerable<string> Destinations(Claim claim)

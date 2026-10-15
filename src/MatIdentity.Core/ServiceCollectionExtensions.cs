@@ -29,6 +29,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ActivityService>();
         services.AddScoped<ClientService>();
         services.AddScoped<TokenRevoker>();
+        services.AddScoped<MatIdentity.Core.Access.PermissionService>();
+        services.AddScoped<MatIdentity.Core.Access.GroupService>();
 
         return services;
     }

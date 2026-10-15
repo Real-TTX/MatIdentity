@@ -1,3 +1,4 @@
+using MatIdentity.Core.Access;
 using MatIdentity.Core.Auth;
 using MatIdentity.Core.Clients;
 using MatIdentity.Core.Entities;
@@ -18,9 +19,11 @@ public class IndexModel : PageModel
     private readonly UserService _userService;
     private readonly SessionService _sessions;
     private readonly TokenRevoker _revoker;
+    private readonly PermissionService _permissions;
 
-    public IndexModel(UserService userService, SessionService sessions, TokenRevoker revoker)
+    public IndexModel(UserService userService, SessionService sessions, TokenRevoker revoker, PermissionService permissions)
     {
+        _permissions = permissions;
         _userService = userService;
         _sessions = sessions;
         _revoker = revoker;
@@ -99,6 +102,7 @@ public class IndexModel : PageModel
         {
             await _sessions.InvalidateAllAsync(user.Id, ct: HttpContext.RequestAborted);
             await _revoker.RevokeForSubjectAsync(user.Subject, HttpContext.RequestAborted);
+            await _permissions.RemoveUserAsync(user.Id, HttpContext.RequestAborted);
         }
 
         var deleted = await _userService.DeleteAsync(id, HttpContext.RequestAborted);

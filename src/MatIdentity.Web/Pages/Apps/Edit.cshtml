@@ -31,6 +31,11 @@
 }
 else
 {
+    @if (Model.IsEdit)
+    {
+        <tab-bar model="Model.Tabs" label="@Model.Input.DisplayName" />
+    }
+
     @if (Model.ManagedBy is not null)
     {
         <div class="mat-alert mat-alert--info" role="status"><icon name="info" /><div class="mat-alert__body">Managed by @Model.ManagedBy: it set this app up and changes it when it updates the app. Your changes here may be replaced.</div></div>
@@ -64,6 +69,24 @@ else
                             <input asp-for="Input.AllowMachine" type="checkbox" />
                             <span class="mat-check__text">It calls the API of other apps (Mattiverse does)</span>
                         </label>
+                        <div class="mat-stack mi-indent" data-show-if="#Input_AllowMachine" data-show-value="true">
+                            <label class="mat-check">
+                                <input asp-for="Input.CallsAllApps" type="checkbox" />
+                                <span class="mat-check__text">Every app, also the ones added later</span>
+                            </label>
+                            @if (Model.OtherApps.Count > 0)
+                            {
+                                <div class="mat-stack" data-show-if="#Input_CallsAllApps" data-show-value="false">
+                                    @foreach (var other in Model.OtherApps)
+                                    {
+                                        <label class="mat-check">
+                                            <input type="checkbox" name="Input.CallTargets" value="@other.ClientId" checked="@Model.Input.CallTargets.Contains(other.ClientId)" />
+                                            <span class="mat-check__text">@other.DisplayName <span class="mat-muted mat-mono">app:@other.ClientId</span></span>
+                                        </label>
+                                    }
+                                </div>
+                            }
+                        </div>
                         @if (!Model.IsEdit)
                         {
                             <label class="mat-check">

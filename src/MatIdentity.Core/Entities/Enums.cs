@@ -34,5 +34,8 @@ public enum ActivityKind
     ClientCreated = 5,
     ClientChanged = 6,
     ClientDeleted = 7,
-    ClientSecretRenewed = 8
+    ClientSecretRenewed = 8,
+
+    /// <summary>A person tried to sign in to an app that was not given to them.</summary>
+    AccessDenied = 9
 }

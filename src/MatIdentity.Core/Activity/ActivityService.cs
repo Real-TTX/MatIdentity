@@ -61,6 +61,7 @@ public sealed class ActivityService
         ActivityKind.ClientChanged => "App changed",
         ActivityKind.ClientDeleted => "App removed",
         ActivityKind.ClientSecretRenewed => "App secret renewed",
+        ActivityKind.AccessDenied => "No access to the app",
         _ => kind.ToString(),
     };
 

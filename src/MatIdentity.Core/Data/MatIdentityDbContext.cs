@@ -27,6 +27,12 @@ public class MatIdentityDbContext : DbContext
     public DbSet<User> Users => Set<User>();
     public DbSet<UserSession> UserSessions => Set<UserSession>();
     public DbSet<ActivityEntry> Activity => Set<ActivityEntry>();
+    public DbSet<Group> Groups => Set<Group>();
+    public DbSet<GroupMember> GroupMembers => Set<GroupMember>();
+    public DbSet<AppPolicy> AppPolicies => Set<AppPolicy>();
+    public DbSet<AppRole> AppRoles => Set<AppRole>();
+    public DbSet<AppGrant> AppGrants => Set<AppGrant>();
+    public DbSet<AppCallGrant> AppCallGrants => Set<AppCallGrant>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -76,6 +82,72 @@ public class MatIdentityDbContext : DbContext
             e.Property(x => x.Detail).HasMaxLength(500);
             e.HasIndex(x => x.CreateDate);
             e.HasIndex(x => x.Kind);
+            e.HasQueryFilter(x => x.UpdateState != UpdateState.Deleted);
+        });
+
+        modelBuilder.Entity<Group>(e =>
+        {
+            e.ToTable("Group");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Name).HasMaxLength(100).IsRequired();
+            e.Property(x => x.Description).HasMaxLength(500);
+            e.HasIndex(x => x.Name).IsUnique().HasFilter("\"UpdateState\" <> 0");
+            e.HasQueryFilter(x => x.UpdateState != UpdateState.Deleted);
+        });
+
+        modelBuilder.Entity<GroupMember>(e =>
+        {
+            e.ToTable("GroupMember");
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.GroupId, x.UserId }).IsUnique().HasFilter("\"UpdateState\" <> 0");
+            e.HasIndex(x => x.UserId);
+            e.HasOne(x => x.Group).WithMany(g => g.Members).HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasQueryFilter(x => x.UpdateState != UpdateState.Deleted);
+        });
+
+        modelBuilder.Entity<AppPolicy>(e =>
+        {
+            e.ToTable("AppPolicy");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.ClientId).HasMaxLength(100).IsRequired();
+            e.Property(x => x.RoleMode).HasConversion<int>();
+            e.HasIndex(x => x.ClientId).IsUnique().HasFilter("\"UpdateState\" <> 0");
+            e.HasQueryFilter(x => x.UpdateState != UpdateState.Deleted);
+        });
+
+        modelBuilder.Entity<AppRole>(e =>
+        {
+            e.ToTable("AppRole");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.ClientId).HasMaxLength(100).IsRequired();
+            e.Property(x => x.Key).HasMaxLength(64).IsRequired();
+            e.Property(x => x.Label).HasMaxLength(100).IsRequired();
+            e.HasIndex(x => new { x.ClientId, x.Key }).IsUnique().HasFilter("\"UpdateState\" <> 0");
+            e.HasQueryFilter(x => x.UpdateState != UpdateState.Deleted);
+        });
+
+        modelBuilder.Entity<AppGrant>(e =>
+        {
+            e.ToTable("AppGrant");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.ClientId).HasMaxLength(100).IsRequired();
+            e.Property(x => x.RoleKey).HasMaxLength(64);
+            e.HasIndex(x => x.ClientId);
+            e.HasIndex(x => x.UserId);
+            e.HasIndex(x => x.GroupId);
+            e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Group).WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Cascade);
+            e.HasQueryFilter(x => x.UpdateState != UpdateState.Deleted);
+        });
+
+        modelBuilder.Entity<AppCallGrant>(e =>
+        {
+            e.ToTable("AppCallGrant");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.CallerClientId).HasMaxLength(100).IsRequired();
+            e.Property(x => x.TargetClientId).HasMaxLength(100).IsRequired();
+            e.HasIndex(x => new { x.CallerClientId, x.TargetClientId }).IsUnique().HasFilter("\"UpdateState\" <> 0");
             e.HasQueryFilter(x => x.UpdateState != UpdateState.Deleted);
         });
 
