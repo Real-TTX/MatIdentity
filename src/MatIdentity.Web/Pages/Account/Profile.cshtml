@@ -1,0 +1,100 @@
+@page
+@model MatIdentity.Web.Pages.Account.ProfileModel
+@{
+    ViewData["Title"] = "Account";
+    ViewData["PageSub"] = "Who you are in all Mat apps, your password and where you are signed in.";
+    ViewData["Crumbs"] = Crumbs.Of(("Account", null));
+    ViewData["Width"] = "narrow";
+}
+
+@if (Model.MustChange)
+{
+    <div class="mat-alert mat-alert--warning" role="alert"><icon name="alert" /><div class="mat-alert__body">Please set your own password before you continue.</div></div>
+}
+
+<tab-bar model="Model.Tabs" label="Account" />
+
+@if (Model.ActiveTab == "general")
+{
+    <div class="mat-card">
+        <div class="mat-card__head"><icon name="user" /><span class="mat-card__title">Your account</span></div>
+        <div class="mat-card__body">
+            <dl class="mat-kv">
+                <dt>Username</dt><dd>@Model.Username</dd>
+                <dt>Display name</dt><dd>@Model.DisplayName</dd>
+                <dt>E-mail</dt><dd>@(Model.Email ?? "–")</dd>
+                <dt>Role</dt><dd>@Model.Role</dd>
+            </dl>
+            <p class="mat-hint">The apps see your display name, your e-mail and your role. An administrator changes them.</p>
+        </div>
+    </div>
+}
+else if (Model.ActiveTab == "password")
+{
+    <form method="post" class="mat-form" novalidate>
+        <input type="hidden" asp-for="ReturnUrl" />
+        <partial name="_ValidationSummary" />
+
+        <div class="mat-card">
+            <div class="mat-card__head"><icon name="key" /><span class="mat-card__title">Change password</span></div>
+            <div class="mat-card__body mat-stack">
+                <mat-field label="Current password" asp-for="Input.CurrentPassword" required="true">
+                    <input asp-for="Input.CurrentPassword" type="password" class="mat-input" autocomplete="current-password" required data-msg-required="Please enter your current password." />
+                </mat-field>
+                <mat-field label="New password" asp-for="Input.NewPassword" required="true" hint="At least 8 characters.">
+                    <input asp-for="Input.NewPassword" type="password" class="mat-input" autocomplete="new-password" required minlength="8" data-msg-required="Please enter a new password." data-msg-range="Use at least 8 characters." />
+                </mat-field>
+                <mat-field label="Confirm new password" asp-for="Input.ConfirmPassword" required="true">
+                    <input asp-for="Input.ConfirmPassword" type="password" class="mat-input" autocomplete="new-password" required data-msg-required="Please repeat the new password." />
+                </mat-field>
+            </div>
+        </div>
+
+        <div class="mat-btn-row">
+            <button type="submit" class="mat-btn mat-btn--primary"><icon name="save" /><span>Save</span></button>
+            <a href="/Account/Profile" class="mat-btn mat-btn--secondary"><icon name="back" /><span>Back</span></a>
+        </div>
+    </form>
+}
+else
+{
+    <div class="mat-list">
+        <div class="mat-table-wrap">
+            <table class="mat-table">
+                <caption class="mat-sr-only">Where you are signed in</caption>
+                <thead>
+                    <tr><th scope="col">Device</th><th scope="col" class="mat-hide-sm">Address</th><th scope="col">Last seen</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var s in Model.Sessions)
+                    {
+                        <tr>
+                            <td data-label="Device">
+                                <div class="mat-table__name">@Format.Browser(s.UserAgent)</div>
+                                @if (s.Token == Model.CurrentToken)
+                                {
+                                    <span class="mat-pill mat-pill--ok">This device</span>
+                                }
+                            </td>
+                            <td data-label="Address" class="mat-hide-sm mat-mono">@(s.IpAddress ?? "–")</td>
+                            <td data-label="Last seen" class="mat-nowrap">@Format.Ago(s.LastSeenAt)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="mat-actions">
+            @if (Model.Sessions.Count > 1)
+            {
+                <form method="post" asp-page-handler="SignOutOthers" data-confirm="Sign out on every other device? The apps there ask you to sign in again." data-confirm-ok="Sign out" data-confirm-danger>
+                    <button type="submit" class="mat-btn mat-btn--danger"><icon name="logout" /><span>Sign out on other devices</span></button>
+                </form>
+            }
+            else
+            {
+                <p class="mat-hint">You are signed in on this device only.</p>
+            }
+        </div>
+    </div>
+}

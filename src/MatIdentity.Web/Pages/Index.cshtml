@@ -1,0 +1,84 @@
+@page
+@model MatIdentity.Web.Pages.IndexModel
+@{
+    ViewData["Title"] = "Home";
+    ViewData["PageSub"] = "One sign-in for all your apps.";
+    var isAdmin = User.IsAdmin();
+}
+
+@if (isAdmin && Model.Tiles.Count > 0)
+{
+    <section class="mi-stats" aria-label="At a glance">
+        @foreach (var (item, value) in Model.Tiles)
+        {
+            <div class="mat-card mat-stat mi-stat @(value.Level is "warn" ? "mi-stat--warn" : value.Level is "error" ? "mi-stat--error" : "")">
+                <span class="mi-stat__icon">@Ui.Icon(item.Icon ?? "info")</span>
+                <div>
+                    <div class="mat-stat__value">@value.Value</div>
+                    <div class="mat-stat__label">@item.Label</div>
+                </div>
+            </div>
+        }
+    </section>
+}
+
+<section class="mat-section" aria-labelledby="apps-title">
+    <div class="mat-section__head"><h2 id="apps-title">Your apps</h2></div>
+    @if (Model.Apps.Count == 0)
+    {
+        <div class="mat-empty">
+            <span class="mat-empty__icon"><icon name="apps" /></span>
+            <div class="mat-empty__title">No apps yet</div>
+            @if (isAdmin)
+            {
+                <p>Add the first app that signs in through @Ui.App.Name. Mattiverse does it on its own when it installs an app.</p>
+                <a class="mat-btn mat-btn--primary" href="/Apps/Edit"><icon name="plus" /><span>Add an app</span></a>
+            }
+            else
+            {
+                <p>An administrator has not added an app with an address yet.</p>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="mi-tiles">
+            @foreach (var a in Model.Apps)
+            {
+                <a class="mi-tile" href="@a.HomeUrl" rel="noopener">
+                    <span class="mi-tile__icon mi-hue-@Ui.Hue(a.ClientId)" aria-hidden="true">@Ui.AppLetters(a.DisplayName)</span>
+                    <span class="mi-tile__label">@a.DisplayName</span>
+                </a>
+            }
+        </div>
+    }
+</section>
+
+@if (isAdmin && Model.Recent.Count > 0)
+{
+    <section class="mat-section" aria-labelledby="recent-title">
+        <div class="mat-section__head"><h2 id="recent-title">Recently</h2></div>
+        <div class="mat-table-wrap">
+            <table class="mat-table">
+                <caption class="mat-sr-only">Recent activity</caption>
+                <thead>
+                    <tr><th scope="col">What</th><th scope="col">Who</th><th scope="col" class="mat-hide-sm">App</th><th scope="col">When</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var e in Model.Recent)
+                    {
+                        <tr>
+                            <td data-label="What"><partial name="_ActivityPill" model="e.Kind" /></td>
+                            <td data-label="Who">@(e.Username ?? "–")</td>
+                            <td data-label="App" class="mat-hide-sm mat-mono">@(e.ClientId ?? "–")</td>
+                            <td data-label="When" class="mat-nowrap">@Format.Ago(e.CreateDate)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <div class="mat-actions">
+            <a class="mat-btn mat-btn--secondary" href="/Activity"><icon name="activity" /><span>All activity</span></a>
+        </div>
+    </section>
+}

@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MatIdentity.Core/MatIdentity.Core.csproj" />
+    <Project Path="src/MatIdentity.Web/MatIdentity.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/MatIdentity.Tests/MatIdentity.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,56 @@
+@page
+@model MatIdentity.Web.Pages.Activity.IndexModel
+@{
+    ViewData["Title"] = "Activity";
+    ViewData["PageSub"] = "Who signed in where, which app got a token, what changed. Kept for 90 days.";
+    ViewData["Crumbs"] = Crumbs.Of(("Activity", null));
+    var list = Model.List;
+}
+
+<div class="mat-list">
+    <partial name="_Toolbar" model="list.Toolbar" />
+
+    @if (list.Items.Count == 0)
+    {
+        <div class="mat-empty">
+            <span class="mat-empty__icon"><icon name="activity" /></span>
+            @if (list.Filtered)
+            {
+                <div class="mat-empty__title">Nothing matches</div>
+                <p>No entry matches. Change the search or the filter.</p>
+                <a class="mat-btn mat-btn--secondary" href="/Activity">Reset the tools</a>
+            }
+            else
+            {
+                <div class="mat-empty__title">Nothing happened yet</div>
+                <p>Sign-ins and changes show up here.</p>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="mat-table-wrap">
+            <table class="mat-table">
+                <caption class="mat-sr-only">Activity</caption>
+                <thead>
+                    <tr><th scope="col">When</th><th scope="col">What</th><th scope="col">Who</th><th scope="col" class="mat-hide-sm">App</th><th scope="col" class="mat-hide-sm">Address</th><th scope="col" class="mat-hide-sm">Detail</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var e in list.Items)
+                    {
+                        <tr>
+                            <td data-label="When" class="mat-nowrap mat-mono">@Format.DateTimeLocal(e.CreateDate)</td>
+                            <td data-label="What"><partial name="_ActivityPill" model="e.Kind" /></td>
+                            <td data-label="Who">@(e.Username ?? "–")</td>
+                            <td data-label="App" class="mat-hide-sm mat-mono">@(e.ClientId ?? "–")</td>
+                            <td data-label="Address" class="mat-hide-sm mat-mono">@(e.IpAddress ?? "–")</td>
+                            <td data-label="Detail" class="mat-hide-sm mat-muted">@(e.Detail ?? string.Empty)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    <partial name="_Pager" model="list.Pager" />
+</div>

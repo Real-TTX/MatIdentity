@@ -1,0 +1,15 @@
+@model ActivityKind
+@*
+    What happened, as a pill: the words of ActivityService.Describe, the tone by its meaning (COLOR-03: a failure is an error, a change is info).
+*@
+@{
+    var tone = Model switch
+    {
+        ActivityKind.SignInFailed => "mat-pill--error",
+        ActivityKind.SignIn or ActivityKind.AppSignIn => "mat-pill--ok",
+        ActivityKind.ClientDeleted or ActivityKind.ClientSecretRenewed => "mat-pill--warn",
+        ActivityKind.ClientCreated or ActivityKind.ClientChanged or ActivityKind.MachineToken => "mat-pill--info",
+        _ => string.Empty,
+    };
+}
+<span class="mat-pill @tone">@MatIdentity.Core.Activity.ActivityService.Describe(Model)</span>

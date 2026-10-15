@@ -1,0 +1,62 @@
+/* =====================================================================
+   MatIdentity: the few things only this app has.
+   Everything else (the shell, lists, forms, dialogs, colours, dark mode) comes from MatUi in wwwroot/matui.
+   The classes here start with mi-, the colours are tokens of the toolkit (rules CODE-02, CODE-04, COLOR-01).
+   ===================================================================== */
+
+/* The logo is a picture of its own with rounded corners: the tile of the toolkit shows no colour behind it. */
+.mat-logo.mi-logo { background: none; }
+
+/* ---- Home: the figures of an administrator, two in a row on a phone ---- */
+.mi-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); gap: var(--mat-gap); }
+.mi-stat { display: flex; align-items: center; gap: var(--mat-space-3); }
+.mi-stat__icon { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: var(--mat-radius); background: var(--mat-accent-soft); color: var(--mat-accent-text); font-size: 1.25rem; }
+.mi-stat--warn .mi-stat__icon { background: var(--mat-warning-bg); color: var(--mat-warning-text); }
+.mi-stat--error .mi-stat__icon { background: var(--mat-danger-bg); color: var(--mat-danger-text); }
+@media (max-width: 600px) { .mi-stat__icon { display: none; } }
+
+/* ---- Home: the apps a person can open, as tiles ---- */
+.mi-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: var(--mat-space-3); }
+.mi-tile {
+  display: flex; flex-direction: column; align-items: center; gap: var(--mat-space-2);
+  min-width: 0;
+  padding: var(--mat-space-4) var(--mat-space-2) var(--mat-space-3);
+  background: var(--mat-surface);
+  border: 1px solid var(--mat-border);
+  border-radius: var(--mat-radius-lg);
+  color: var(--mat-text);
+  text-align: center;
+  text-decoration: none;
+  transition: border-color var(--mat-dur) var(--mat-ease), background var(--mat-dur) var(--mat-ease);
+}
+.mi-tile:hover { background: var(--mat-surface-2); border-color: var(--mat-text-faint); text-decoration: none; }
+.mi-tile__icon {
+  display: grid; place-items: center;
+  width: 56px; height: 56px;
+  border-radius: 22%;
+  background: var(--mat-accent);
+  color: var(--mat-on-accent);
+  font-size: var(--mat-fs-lg);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.mi-tile__label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--mat-fs-sm); font-weight: 600; }
+
+/* ---- The variables of an app: mono, wraps, can be copied ---- */
+.mi-env { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--mat-fs-sm); }
+
+/* Each app gets its own tint, turned from the accent, so the same app always has the same colour (text stays the on-accent colour: the lightness does not change). */
+@supports (color: oklch(from red l c h)) {
+  .mi-hue-0 { background: oklch(from var(--mat-accent) l c calc(h + 0)); }
+  .mi-hue-1 { background: oklch(from var(--mat-accent) l c calc(h + 30)); }
+  .mi-hue-2 { background: oklch(from var(--mat-accent) l c calc(h + 60)); }
+  .mi-hue-3 { background: oklch(from var(--mat-accent) l c calc(h + 90)); }
+  .mi-hue-4 { background: oklch(from var(--mat-accent) l c calc(h + 120)); }
+  .mi-hue-5 { background: oklch(from var(--mat-accent) l c calc(h + 150)); }
+  .mi-hue-6 { background: oklch(from var(--mat-accent) l c calc(h + 180)); }
+  .mi-hue-7 { background: oklch(from var(--mat-accent) l c calc(h + 210)); }
+  .mi-hue-8 { background: oklch(from var(--mat-accent) l c calc(h + 240)); }
+  .mi-hue-9 { background: oklch(from var(--mat-accent) l c calc(h + 270)); }
+  .mi-hue-10 { background: oklch(from var(--mat-accent) l c calc(h + 300)); }
+  .mi-hue-11 { background: oklch(from var(--mat-accent) l c calc(h + 330)); }
+}

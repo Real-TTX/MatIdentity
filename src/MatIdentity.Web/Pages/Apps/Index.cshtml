@@ -1,0 +1,92 @@
+@page
+@model MatIdentity.Web.Pages.Apps.IndexModel
+@{
+    ViewData["Title"] = "Apps";
+    ViewData["PageSub"] = "The apps that sign people in through MatIdentity, and the apps that may call other apps.";
+    ViewData["Crumbs"] = Crumbs.Of(("Apps", null));
+    var list = Model.List;
+}
+
+<div class="mat-list">
+    <partial name="_Toolbar" model="list.Toolbar" />
+
+    @if (list.Items.Count == 0)
+    {
+        <div class="mat-empty">
+            <span class="mat-empty__icon"><icon name="apps" /></span>
+            @if (list.Filtered)
+            {
+                <div class="mat-empty__title">Nothing matches</div>
+                <p>No app matches. Change the search or the filter.</p>
+                <a class="mat-btn mat-btn--secondary" href="/Apps">Reset the tools</a>
+            }
+            else
+            {
+                <div class="mat-empty__title">No apps yet</div>
+                <p>Add an app, or let Mattiverse add it when it installs one.</p>
+                <a class="mat-btn mat-btn--primary" href="/Apps/Edit"><icon name="plus" /><span>Add an app</span></a>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="mat-table-wrap">
+            <table class="mat-table">
+                <caption class="mat-sr-only">Apps</caption>
+                <thead>
+                    <tr><th scope="col">App</th><th scope="col" class="mat-hide-sm">Id</th><th scope="col">Kind</th><th scope="col" class="mat-hide-sm">Address</th><th scope="col"><span class="mat-sr-only">Actions</span></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var c in list.Items)
+                    {
+                        <tr>
+                            <td data-label="App">
+                                <div class="mat-table__name"><a href="/Apps/Edit?id=@c.ClientId">@c.DisplayName</a></div>
+                                @if (c.ManagedBy is not null)
+                                {
+                                    <span class="mat-tag">Managed by @c.ManagedBy</span>
+                                }
+                            </td>
+                            <td data-label="Id" class="mat-hide-sm mat-mono">@c.ClientId</td>
+                            <td data-label="Kind">
+                                @if (c.AllowSignIn)
+                                {
+                                    <span class="mat-pill mat-pill--ok">Sign-in</span>
+                                }
+                                @if (c.AllowMachine)
+                                {
+                                    <span class="mat-pill mat-pill--info">Calls apps</span>
+                                }
+                            </td>
+                            <td data-label="Address" class="mat-hide-sm">
+                                @if (c.HomeUrl is not null)
+                                {
+                                    <a href="@c.HomeUrl" rel="noopener">@c.HomeUrl</a>
+                                }
+                                else
+                                {
+                                    <span class="mat-muted">–</span>
+                                }
+                            </td>
+                            <td class="mat-table__cell-actions">
+                                <div class="mat-table__actions">
+                                    <a class="mat-btn mat-btn--ghost mat-btn--icon mat-btn--sm" href="/Apps/Edit?id=@c.ClientId" aria-label="Edit @c.DisplayName" data-tip="Edit"><icon name="edit" /></a>
+                                    <form method="post" asp-page-handler="Delete" data-confirm="Remove the app @c.DisplayName? Nobody can sign in to it through MatIdentity any more." data-confirm-ok="Remove" data-confirm-danger>
+                                        <input type="hidden" name="clientId" value="@c.ClientId" />
+                                        <button type="submit" class="mat-btn mat-btn--danger mat-btn--icon mat-btn--sm" aria-label="Remove @c.DisplayName" data-tip="Remove"><icon name="trash" /></button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    <partial name="_Pager" model="list.Pager" />
+
+    <div class="mat-actions">
+        <a href="/Apps/Edit" class="mat-btn mat-btn--primary"><icon name="plus" /><span>Add an app</span></a>
+    </div>
+</div>

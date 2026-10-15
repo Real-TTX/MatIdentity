@@ -1,0 +1,56 @@
+# MatIdentity – development stack: builds the image from the source in this folder.
+# The only other service is a SQLite web viewer (the SQLite counterpart of pgAdmin).
+#   ./scripts/redeploy.ps1            (rebuilds the container and redeploys the stack)
+#   docker compose -f docker-compose.dev.yml up -d --build
+#
+# Web:        http://localhost:2300      (MATIDENTITY_PORT changes the host port)
+# SQLite web: http://localhost:2309      (MATIDENTITY_DB_PORT changes the host port)
+name: matidentity-dev
+
+services:
+  matidentity:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        Channel: ${MATIDENTITY_CHANNEL:-local}
+        BuildNumber: ${MATIDENTITY_BUILD_NUMBER:-0}
+        BuildDate: ${MATIDENTITY_BUILD_DATE:-}
+    image: matidentity:dev
+    container_name: matidentity-dev
+    restart: unless-stopped
+    ports:
+      - "${MATIDENTITY_PORT:-2300}:2300"
+    environment:
+      # Development seeds a ready-to-use account (tester / Tester123!) so testing never touches the real admin.
+      ASPNETCORE_ENVIRONMENT: Development
+      # The key of the platform API, for trying /api/state and /api/configure with curl.
+      MAT_API_KEY: ${MATIDENTITY_API_KEY:-dev-key}
+    volumes:
+      - matidentity-data:/data
+
+  sqlite-web:
+    image: coleifer/sqlite-web:latest
+    container_name: matidentity-dev-sqlite-web
+    restart: unless-stopped
+    # Only once MatIdentity has created its database: the viewer runs as root and would otherwise create an empty one first.
+    depends_on:
+      matidentity:
+        condition: service_healthy
+    ports:
+      - "${MATIDENTITY_DB_PORT:-2309}:8080"
+    environment:
+      SQLITE_DATABASE: /data/matidentity.db
+    volumes:
+      - matidentity-data:/data
+
+volumes:
+  matidentity-data:
+
+# An explicit subnet: on a machine with many stacks Docker can run out of its default address pools
+# ("all predefined address pools have been fully subnetted"). Override with MATIDENTITY_DEV_SUBNET if this range collides.
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: ${MATIDENTITY_DEV_SUBNET:-10.253.24.0/24}

@@ -1,0 +1,62 @@
+@page
+@model MatIdentity.Web.Pages.Settings.IndexModel
+@{
+    ViewData["Title"] = "Settings";
+    ViewData["PageSub"] = "The name, the public address and how long a sign-in lasts.";
+    ViewData["Crumbs"] = Crumbs.Of(("Settings", null));
+    ViewData["Width"] = "narrow";
+}
+
+<form method="post" class="mat-form" novalidate>
+    <partial name="_ValidationSummary" />
+
+    <div class="mat-card">
+        <div class="mat-card__head"><icon name="settings" /><span class="mat-card__title">General</span></div>
+        <div class="mat-card__body mat-stack">
+            <mat-field label="Name" asp-for="Input.InstanceName" required="true" hint="Shown on the sign-in page and in the menu.">
+                <input asp-for="Input.InstanceName" class="mat-input" required maxlength="80" data-msg-required="Please enter a name." />
+            </mat-field>
+            <mat-field label="Public address" asp-for="Input.Issuer" hint="The address the apps reach MatIdentity at, like https://id.example.com. Empty: the address of each request. Takes effect after a restart.">
+                <input asp-for="Input.Issuer" type="url" class="mat-input" placeholder="https://id.example.com" data-msg-type="Enter an absolute address like https://id.example.com." />
+            </mat-field>
+        </div>
+    </div>
+
+    <div class="mat-card">
+        <div class="mat-card__head"><icon name="key" /><span class="mat-card__title">Sign-in</span></div>
+        <div class="mat-card__body mat-form__grid">
+            <mat-field label="Stay signed in (days)" asp-for="Input.SessionLifetimeDays" required="true" hint="Without activity a person signs in again after this many days.">
+                <input asp-for="Input.SessionLifetimeDays" type="number" class="mat-input" min="1" max="365" required data-msg-range="Choose between 1 and 365 days." />
+            </mat-field>
+            <mat-field label="Access token (minutes)" asp-for="Input.AccessTokenMinutes" required="true" hint="Short is safer; the apps renew it on their own. Takes effect after a restart.">
+                <input asp-for="Input.AccessTokenMinutes" type="number" class="mat-input" min="5" max="1440" required data-msg-range="Choose between 5 and 1440 minutes." />
+            </mat-field>
+        </div>
+    </div>
+
+    <div class="mat-btn-row">
+        <button type="submit" class="mat-btn mat-btn--primary"><icon name="save" /><span>Save</span></button>
+        <a href="/" class="mat-btn mat-btn--secondary"><icon name="back" /><span>Back</span></a>
+    </div>
+</form>
+
+<div class="mat-card">
+    <div class="mat-card__head"><icon name="link" /><span class="mat-card__title">Connecting apps</span></div>
+    <div class="mat-card__body">
+        <dl class="mat-kv">
+            <dt>Authority</dt><dd class="mat-mono">@Model.AuthorityUrl</dd>
+            <dt>Discovery</dt><dd class="mat-mono">@Model.AuthorityUrl/.well-known/openid-configuration</dd>
+            <dt>Platform API</dt><dd>@(Model.ApiKeyEnabled ? "On: with the key MAT_API_KEY or a token for app:matidentity" : "Only with a token for app:matidentity (MAT_API_KEY is not set)")</dd>
+        </dl>
+    </div>
+</div>
+
+<div class="mat-card">
+    <div class="mat-card__head"><icon name="alert" /><span class="mat-card__title">Emergency</span></div>
+    <div class="mat-card__body mat-stack">
+        <p class="mat-muted">Ends every sign-in: here and, at their next renewal, in every app. Everyone signs in again, you too.</p>
+        <form method="post" asp-page-handler="SignOutEveryone" data-confirm="Sign everyone out? Every person has to sign in again, in every app." data-confirm-ok="Sign everyone out" data-confirm-danger>
+            <button type="submit" class="mat-btn mat-btn--danger"><icon name="logout" /><span>Sign everyone out</span></button>
+        </form>
+    </div>
+</div>

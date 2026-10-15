@@ -1,0 +1,49 @@
+#!/usr/bin/env pwsh
+<#
+.SYNOPSIS
+    Rebuilds the MatIdentity container and redeploys the dev stack (the project's live-reload / test workflow).
+.DESCRIPTION
+    Always rebuilds the image from the current source and recreates the container; the data volume stays.
+    The version of a local build is "local-<builddate>".
+.PARAMETER Fresh
+    Also deletes the data volume first (clean start, the first-run setup appears again; new token keys sign every app out).
+.PARAMETER Port
+    Host port of the web interface (default 2300).
+.EXAMPLE
+    ./scripts/redeploy.ps1
+.EXAMPLE
+    ./scripts/redeploy.ps1 -Fresh -Port 2310
+#>
+param(
+    [switch]$Fresh,
+    [int]$Port = 2300
+)
+
+$ErrorActionPreference = 'Stop'
+$root = Split-Path -Parent $PSScriptRoot
+Push-Location $root
+try {
+    $env:MATIDENTITY_CHANNEL = 'local'
+    $env:MATIDENTITY_BUILD_DATE = (Get-Date).ToUniversalTime().ToString('yyyyMMdd')
+    $env:MATIDENTITY_PORT = "$Port"
+
+    $compose = @('compose', '-f', 'docker-compose.dev.yml')
+
+    # Windows PowerShell 5.1 turns the progress lines docker writes to stderr into errors; judge by the exit code instead.
+    $ErrorActionPreference = 'Continue'
+
+    if ($Fresh) {
+        Write-Host 'Removing the stack and its volume ...' -ForegroundColor Yellow
+        docker @compose down -v
+    }
+
+    docker @compose up -d --build --remove-orphans
+    if ($LASTEXITCODE -ne 0) { throw 'docker compose failed.' }
+
+    Write-Host ''
+    Write-Host "MatIdentity local-$($env:MATIDENTITY_BUILD_DATE) is running on http://localhost:$Port" -ForegroundColor Green
+    Write-Host 'Dev login: tester / Tester123!   |   SQLite web: http://localhost:2309' -ForegroundColor DarkGray
+}
+finally {
+    Pop-Location
+}

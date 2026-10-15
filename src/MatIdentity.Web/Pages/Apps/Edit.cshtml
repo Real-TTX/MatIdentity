@@ -1,0 +1,118 @@
+@page
+@model MatIdentity.Web.Pages.Apps.EditModel
+@{
+    ViewData["Title"] = Model.IsEdit ? Model.Input.DisplayName : "Add an app";
+    ViewData["PageSub"] = Model.IsEdit ? "Who may sign in through it, and where it sends people back to." : "An app whose people sign in through MatIdentity, or that calls other apps.";
+    ViewData["Crumbs"] = Crumbs.Of(("Apps", "/Apps"), (Model.IsEdit ? Model.Input.DisplayName : "Add an app", null));
+    ViewData["Width"] = "narrow";
+    var env = $"MATIDENTITY_AUTHORITY={Model.AuthorityUrl}\nMATIDENTITY_CLIENT_ID={Model.Input.ClientId}" + (Model.NewSecret is null ? string.Empty : $"\nMATIDENTITY_CLIENT_SECRET={Model.NewSecret}");
+}
+
+@if (Model.NewSecret is not null)
+{
+    <div class="mat-alert mat-alert--warning" role="alert">
+        <icon name="key" />
+        <div class="mat-alert__body">
+            <strong>The secret of @Model.Input.DisplayName, shown only now.</strong>
+            Copy it into the settings of the app. MatIdentity keeps only a hash of it; if it is lost, make a new one.
+        </div>
+    </div>
+
+    <div class="mat-card">
+        <div class="mat-card__head"><icon name="code" /><span class="mat-card__title">Variables for the app</span></div>
+        <div class="mat-card__body mat-stack">
+            <pre class="mat-code mi-env" id="app-env">@env</pre>
+            <div class="mat-btn-row mat-btn-row--plain">
+                <button type="button" class="mat-btn mat-btn--primary" data-copy="#app-env"><icon name="copy" /><span>Copy the variables</span></button>
+                <a class="mat-btn mat-btn--secondary" href="/Apps"><icon name="check" /><span>Done</span></a>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    @if (Model.ManagedBy is not null)
+    {
+        <div class="mat-alert mat-alert--info" role="status"><icon name="info" /><div class="mat-alert__body">Managed by @Model.ManagedBy: it set this app up and changes it when it updates the app. Your changes here may be replaced.</div></div>
+    }
+
+    <form method="post" class="mat-form" novalidate>
+        <partial name="_ValidationSummary" />
+
+        <div class="mat-card">
+            <div class="mat-card__body">
+                <div class="mat-form__grid">
+                    <mat-field label="Id" asp-for="Input.ClientId" required="true" hint="Small letters, like the app: matsplit. It cannot change later.">
+                        <input asp-for="Input.ClientId" class="mat-input mat-mono" autocomplete="off" readonly="@Model.IsEdit" required pattern="[a-z0-9][a-z0-9_\-]{1,62}" data-msg-required="Please enter the id of the app." data-msg-pattern="Use small letters, digits, - or _." />
+                    </mat-field>
+
+                    <mat-field label="Name" asp-for="Input.DisplayName" required="true">
+                        <input asp-for="Input.DisplayName" class="mat-input" required maxlength="100" data-msg-required="Please enter a name." />
+                    </mat-field>
+
+                    <mat-field label="Address" asp-for="Input.HomeUrl" full="true" hint="Where the app is opened. It then shows on the start page of every person.">
+                        <input asp-for="Input.HomeUrl" type="url" class="mat-input" placeholder="https://split.example.com" data-msg-type="Enter an absolute address like https://split.example.com." />
+                    </mat-field>
+
+                    <fieldset class="mat-field mat-fieldset mat-field--full">
+                        <legend class="mat-label">What the app does</legend>
+                        <label class="mat-check">
+                            <input asp-for="Input.AllowSignIn" type="checkbox" />
+                            <span class="mat-check__text">People sign in to it through MatIdentity</span>
+                        </label>
+                        <label class="mat-check">
+                            <input asp-for="Input.AllowMachine" type="checkbox" />
+                            <span class="mat-check__text">It calls the API of other apps (Mattiverse does)</span>
+                        </label>
+                        @if (!Model.IsEdit)
+                        {
+                            <label class="mat-check">
+                                <input asp-for="Input.IsPublic" type="checkbox" />
+                                <span class="mat-check__text">It cannot keep a secret (an app in the browser or on a phone)</span>
+                            </label>
+                        }
+                        <span class="mat-error"></span>
+                    </fieldset>
+
+                    <div class="mat-field--full mat-stack" data-show-if="#Input_AllowSignIn" data-show-value="true">
+                        <mat-field label="Sign-in addresses" asp-for="Input.RedirectUris" hint="One per line. Where the app receives the sign-in.">
+                            <textarea asp-for="Input.RedirectUris" class="mat-textarea mat-mono" rows="3" placeholder="@MatIdentity.Web.Pages.Apps.EditModel.SuggestedRedirect(Model.Input.HomeUrl)"></textarea>
+                        </mat-field>
+                        <mat-field label="Addresses after sign-out" asp-for="Input.PostLogoutRedirectUris" hint="One per line. Optional: where the app may send people after they signed out.">
+                            <textarea asp-for="Input.PostLogoutRedirectUris" class="mat-textarea mat-mono" rows="2" placeholder="https://split.example.com/signout-callback-oidc"></textarea>
+                        </mat-field>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mat-btn-row">
+            <button type="submit" class="mat-btn mat-btn--primary"><icon name="save" /><span>Save</span></button>
+            <a href="/Apps" class="mat-btn mat-btn--secondary"><icon name="back" /><span>Back</span></a>
+            @if (Model.IsEdit && !Model.Input.IsPublic)
+            {
+                <span class="mat-btn-row__spacer"></span>
+                <button type="submit" class="mat-btn mat-btn--danger mat-btn--end" asp-page-handler="RenewSecret" formnovalidate data-confirm="Make a new secret? The old one stops working at once; the app needs the new one." data-confirm-ok="New secret" data-confirm-danger><icon name="refresh" /><span>New secret</span></button>
+            }
+        </div>
+    </form>
+
+    @if (Model.IsEdit)
+    {
+        <div class="mat-card">
+            <div class="mat-card__head"><icon name="link" /><span class="mat-card__title">How the app connects</span></div>
+            <div class="mat-card__body mat-stack">
+                <p class="mat-muted">An app of the family needs these variables (and the secret it got when it was added). Any other app that speaks OpenID Connect finds everything at the discovery address.</p>
+                <pre class="mat-code mi-env" id="app-env">@env</pre>
+                <dl class="mat-kv">
+                    <dt>Discovery</dt><dd class="mat-mono">@Model.AuthorityUrl/.well-known/openid-configuration</dd>
+                    <dt>Scopes</dt><dd class="mat-mono">openid profile email roles offline_access</dd>
+                    <dt>Its API</dt><dd class="mat-mono">app:@Model.Input.ClientId</dd>
+                </dl>
+                <div class="mat-btn-row mat-btn-row--plain">
+                    <button type="button" class="mat-btn mat-btn--secondary" data-copy="#app-env"><icon name="copy" /><span>Copy the variables</span></button>
+                </div>
+            </div>
+        </div>
+    }
+}

@@ -1,0 +1,26 @@
+# MatIdentity – release stack: as simple as it gets, one service and one data volume.
+#   docker compose up -d
+#
+# Or without Compose, a single command:
+#   docker run -d --name matidentity --restart unless-stopped -p 2300:2300 -v matidentity-data:/data ghcr.io/real-ttx/matidentity:latest
+#
+# Web: http://localhost:2300  (the first start asks for the administrator)
+# Put it behind your reverse proxy with HTTPS and set the public address in Settings (or MatIdentity__Issuer).
+name: matidentity
+
+services:
+  matidentity:
+    image: ghcr.io/real-ttx/matidentity:latest
+    container_name: matidentity
+    restart: unless-stopped
+    ports:
+      - "${MATIDENTITY_PORT:-2300}:2300"
+    # environment:
+    #   MatIdentity__Issuer: https://id.example.com     # the public address (the iss of the tokens)
+    #   MAT_API_KEY: <a long random key>                 # the key of the platform API (Mattiverse sets it)
+    volumes:
+      # Database, settings and the keys that sign the tokens: back it up like a password safe.
+      - matidentity-data:/data
+
+volumes:
+  matidentity-data:

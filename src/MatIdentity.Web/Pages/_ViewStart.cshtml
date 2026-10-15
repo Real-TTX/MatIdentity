@@ -1,0 +1,4 @@
+@{
+    // Signed in: the shell with its menu. Not signed in (sign-in, setup, a shared link): a centred card without a menu (SHELL-11).
+    Layout = User.Identity?.IsAuthenticated == true ? "_Layout" : "_Bare";
+}

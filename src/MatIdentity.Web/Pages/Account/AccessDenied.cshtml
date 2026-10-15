@@ -1,0 +1,14 @@
+@page
+@{
+    Layout = "_Bare";
+    ViewData["Title"] = "Access denied";
+}
+
+<div class="mat-auth__card">
+    <div class="mat-auth__brand">
+        @Ui.Logo("lg")
+        <h1>Access denied</h1>
+        <p class="mat-muted">You do not have the permissions to open this page.</p>
+    </div>
+    <a href="/" class="mat-btn mat-btn--primary mat-btn--block"><icon name="home" /><span>Back to Home</span></a>
+</div>

@@ -1,0 +1,19 @@
+@page
+@model ErrorModel
+@{
+    Layout = "_Bare";
+    ViewData["Title"] = "Error";
+}
+
+<div class="mat-auth__card">
+    <div class="mat-auth__brand">
+        @Ui.Logo("lg")
+        <h1>Something went wrong</h1>
+        <p class="mat-muted">The request could not be processed.</p>
+        @if (Model.ShowRequestId)
+        {
+            <p class="mat-mono mat-muted">Request id: @Model.RequestId</p>
+        }
+    </div>
+    <a href="/" class="mat-btn mat-btn--primary mat-btn--block"><icon name="home" /><span>Back to Home</span></a>
+</div>
