@@ -155,6 +155,10 @@ public sealed partial class PlatformApiTests
         Assert.Equal(HttpStatusCode.Conflict, (await api.DeleteAsync("/api/v1/clients/matapitest?managedBy=someone")).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await api.DeleteAsync("/api/v1/clients/matapitest?managedBy=mattiverse")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await api.GetAsync("/api/v1/clients/matapitest")).StatusCode);
+
+        // An app without a mark (added in the UI) is deleted with an empty mark.
+        await api.PutAsJsonAsync("/api/v1/clients/matunmarked", new { displayName = "Unmarked", redirectUris = new[] { "https://u.test/signin-oidc" } });
+        Assert.Equal(HttpStatusCode.NoContent, (await api.DeleteAsync("/api/v1/clients/matunmarked?managedBy=")).StatusCode);
     }
 
     [Fact]

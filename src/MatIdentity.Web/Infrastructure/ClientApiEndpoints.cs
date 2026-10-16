@@ -109,7 +109,8 @@ public static class ClientApiEndpoints
             }
 
             // Never delete what the caller did not create.
-            if (!string.Equals(existing.ManagedBy, managedBy, StringComparison.Ordinal))
+            // No mark and an empty mark are the same (an app added in the UI is deleted with ?managedBy=).
+            if (!string.Equals(existing.ManagedBy ?? string.Empty, managedBy ?? string.Empty, StringComparison.Ordinal))
             {
                 return Results.Json(new { errors = new Dictionary<string, string> { ["managedBy"] = "This app was not created by this caller." } }, options, statusCode: StatusCodes.Status409Conflict);
             }

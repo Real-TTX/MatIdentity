@@ -39,6 +39,8 @@ public sealed record MatApiDefinition
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        // Umlauts and other letters as they are (ü, not 00FC); HTML-sensitive characters stay escaped.
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.Create(System.Text.Unicode.UnicodeRanges.All),
         Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
     };
 }
