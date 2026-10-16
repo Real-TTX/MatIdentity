@@ -11,6 +11,7 @@ namespace MatIdentity.Web.Infrastructure;
 /// pages, the same key or token as the rest of <c>/api</c>. Like the engines' APIs: an upsert by id, <c>managedBy</c> marks what a caller created,
 /// and a caller only deletes what carries its own mark.
 /// <code>
+/// GET    /api/v1/status                      { ok, app, version, apiVersion: 1 } (as the engines of Mattiverse answer it)
 /// GET    /api/v1/clients                     the apps (never a secret)
 /// GET    /api/v1/clients/{clientId}
 /// PUT    /api/v1/clients/{clientId}          { displayName, homeUrl, redirectUris, postLogoutRedirectUris, allowSignIn, allowMachine, isPublic, managedBy, renewSecret,
@@ -24,6 +25,11 @@ public static class ClientApiEndpoints
     public static void MapClientApi(this WebApplication app)
     {
         var options = MatApiDefinition.Json;
+
+        // The status every engine of Mattiverse answers (Mattiverse docs/ENGINES.md): it waits for this before it registers anything.
+        app.MapGet("/api/v1/status", () => Results.Json(new { ok = true, app = MatIdentity.Web.Support.Ui.App.Id, version = MatIdentity.Core.AppVersion.Current, apiVersion = 1 }, options))
+            .AllowAnonymous().AddEndpointFilter(ApiAccess.RequireAsync).DisableAntiforgery();
+
         var api = app.MapGroup("/api/v1/clients").AllowAnonymous().AddEndpointFilter(ApiAccess.RequireAsync).DisableAntiforgery();
 
         api.MapGet("/", async (ClientService clients, CancellationToken ct) => Results.Json(await clients.GetAllAsync(ct), options));

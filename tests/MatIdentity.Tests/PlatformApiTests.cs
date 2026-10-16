@@ -79,6 +79,11 @@ public sealed partial class PlatformApiTests
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync("/api/configure")).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.PostAsync("/api/actions/signOutEveryone", null)).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync("/api/v1/clients")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync("/api/v1/status")).StatusCode);
+        using (var status = JsonDocument.Parse(await _site.Api().GetStringAsync("/api/v1/status")))
+        {
+            Assert.Equal(1, status.RootElement.GetProperty("apiVersion").GetInt32());
+        }
 
         var wrong = _site.CreateClient();
         wrong.DefaultRequestHeaders.Add("X-Api-Key", "wrong");
