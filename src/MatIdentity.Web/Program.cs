@@ -122,6 +122,9 @@ builder.Services.AddOpenIddict()
             options.SetIssuer(new Uri(issuer.TrimEnd('/') + "/"));
         }
 
+        // With a fixed public address the discovery document names it, also when an app reads it at the internal address.
+        options.AddEventHandler(PublicEndpoints.Descriptor);
+
         options.UseAspNetCore()
             .EnableAuthorizationEndpointPassthrough()
             .EnableTokenEndpointPassthrough()

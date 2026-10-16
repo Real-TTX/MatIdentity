@@ -78,3 +78,17 @@ public sealed class ClientRulesTests
         Assert.Equal(["accessTokenMinutes", "instanceName", "sessionLifetimeDays"], errors.Keys.Order());
     }
 }
+
+/// <summary>The discovery document names the public address when one is set (an app reads it at the internal address).</summary>
+public sealed class PublicEndpointsTests
+{
+    [Theory]
+    [InlineData("http://mvtest-matidentity-matidentity:2300/connect/authorize", "https://id.example.com/", "https://id.example.com/connect/authorize")]
+    [InlineData("http://localhost:2300/.well-known/jwks", "http://localhost:8601/", "http://localhost:8601/.well-known/jwks")]
+    public void An_endpoint_moves_under_the_issuer(string endpoint, string issuer, string expected)
+        => Assert.Equal(expected, MatIdentity.Web.Infrastructure.PublicEndpoints.Rebase(new Uri(endpoint), new Uri(issuer))!.ToString());
+
+    [Fact]
+    public void No_endpoint_stays_none()
+        => Assert.Null(MatIdentity.Web.Infrastructure.PublicEndpoints.Rebase(null, new Uri("https://id.example.com/")));
+}
