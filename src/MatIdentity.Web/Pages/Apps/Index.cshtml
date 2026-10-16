@@ -12,7 +12,7 @@
 
     @if (list.Items.Count == 0)
     {
-        <div class="mat-empty">
+        <div class="mat-empty @(list.Filtered ? string.Empty : "mat-empty--first")">
             <span class="mat-empty__icon"><icon name="apps" /></span>
             @if (list.Filtered)
             {
@@ -86,11 +86,7 @@
 
     <partial name="_Pager" model="list.Pager" />
 
-    @if (list.Items.Count > 0 || list.Filtered)
-    {
-        @* An empty list offers its action in the empty state itself (LIST-11); the same button below it again would be one too many. *@
-        <div class="mat-actions">
-            <a href="/Apps/Edit" class="mat-btn mat-btn--primary"><icon name="plus" /><span>Add an app</span></a>
-        </div>
-    }
+    <div class="mat-actions">
+        <a href="/Apps/Edit" class="mat-btn mat-btn--primary"><icon name="plus" /><span>Add an app</span></a>
+    </div>
 </div>

@@ -1,4 +1,4 @@
-/* MatUi 0.2.0 (3d220f78e2) - build local-20261016 - bundled from matui.tokens.css, matui.base.css, matui.shell.css, matui.controls.css, matui.forms.css, matui.pickers.css, matui.lists.css, matui.dialogs.css, matui.layout.css, matui.apps.css */
+/* MatUi 0.2.0 (460d08197d) - build local-20261016 - bundled from matui.tokens.css, matui.base.css, matui.shell.css, matui.controls.css, matui.forms.css, matui.pickers.css, matui.lists.css, matui.dialogs.css, matui.layout.css, matui.apps.css */
 /* ==========================================================================
    MatUi · tokens
    The single source of the look of every Mat app. Components use only these custom properties, never a raw colour.
@@ -2590,6 +2590,10 @@ fieldset.mat-rating:not(.is-ready) > .mat-hint, fieldset.mat-rating:not(.is-read
   border-radius: var(--mat-table-radius, var(--mat-radius-lg));
   box-shadow: var(--mat-shadow-1);
 }
+/* An empty list that offers its first item in the empty state (mat-empty--first) does not show the same primary action again below it (LIST-11):
+   the primary button of the actions row goes, the other actions stay, and a row with nothing else goes with it. An empty search (no modifier) keeps its actions. */
+.mat-list:has(> .mat-empty--first) > .mat-actions > .mat-btn--primary { display: none; }
+.mat-list:has(> .mat-empty--first) > .mat-actions:not(:has(> :not(.mat-btn--primary))) { display: none; }
 .mat-table { width: 100%; border-collapse: collapse; font-size: var(--mat-table-font-size, var(--mat-fs-sm)); }
 .mat-table caption { text-align: left; padding: var(--mat-table-pad-y, var(--mat-space-3)) var(--mat-table-pad-x, var(--mat-space-4)); color: var(--mat-text-muted); }
 .mat-table th {
