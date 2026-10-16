@@ -61,7 +61,11 @@
 
     <partial name="_Pager" model="list.Pager" />
 
-    <div class="mat-actions">
-        <a href="/Groups/Edit" class="mat-btn mat-btn--primary"><icon name="plus" /><span>New group</span></a>
-    </div>
+    @if (list.Items.Count > 0 || list.Filtered)
+    {
+        @* An empty list offers its action in the empty state itself (LIST-11); the same button below it again would be one too many. *@
+        <div class="mat-actions">
+            <a href="/Groups/Edit" class="mat-btn mat-btn--primary"><icon name="plus" /><span>New group</span></a>
+        </div>
+    }
 </div>

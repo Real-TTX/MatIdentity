@@ -26,7 +26,7 @@
     <div class="mat-section__head"><h2 id="apps-title">Your apps</h2></div>
     @if (Model.Apps.Count == 0)
     {
-        <div class="mat-empty">
+        <div class="mat-empty mat-empty--framed">
             <span class="mat-empty__icon"><icon name="apps" /></span>
             <div class="mat-empty__title">No apps yet</div>
             @if (isAdmin)
@@ -36,7 +36,7 @@
             }
             else
             {
-                <p>An administrator has not added an app with an address yet.</p>
+                <p>No app has been given to you yet. Ask an administrator to give you one, or to one of your groups.</p>
             }
         </div>
     }

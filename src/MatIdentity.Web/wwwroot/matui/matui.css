@@ -1,4 +1,4 @@
-/* MatUi 0.2.0 (9147df07f6) - build local-20261015 - bundled from matui.tokens.css, matui.base.css, matui.shell.css, matui.controls.css, matui.forms.css, matui.pickers.css, matui.lists.css, matui.dialogs.css, matui.layout.css, matui.apps.css */
+/* MatUi 0.2.0 (3d220f78e2) - build local-20261016 - bundled from matui.tokens.css, matui.base.css, matui.shell.css, matui.controls.css, matui.forms.css, matui.pickers.css, matui.lists.css, matui.dialogs.css, matui.layout.css, matui.apps.css */
 /* ==========================================================================
    MatUi · tokens
    The single source of the look of every Mat app. Components use only these custom properties, never a raw colour.
@@ -2576,6 +2576,15 @@ fieldset.mat-rating:not(.is-ready) > .mat-hint, fieldset.mat-rating:not(.is-read
 /* @prop table | --mat-table-head-font-weight | number | 600 | Weight of the letters of the column headings. */
 .mat-table-wrap {
   overflow-x: auto;
+  background: var(--mat-surface);
+  border: 1px solid var(--mat-border);
+  border-radius: var(--mat-table-radius, var(--mat-radius-lg));
+  box-shadow: var(--mat-shadow-1);
+}
+/* The empty state takes the place of the table or the gallery in a list: the same frame, so a list without rows keeps its shape and the way to fill it
+   stands where the rows will be (LIST-11). Outside a list mat-empty--framed gives it the frame; in a card it needs none (the card is the frame). */
+.mat-list > .mat-empty,
+.mat-empty--framed {
   background: var(--mat-surface);
   border: 1px solid var(--mat-border);
   border-radius: var(--mat-table-radius, var(--mat-radius-lg));
