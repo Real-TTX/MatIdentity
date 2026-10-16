@@ -75,3 +75,17 @@
         <a href="/Users" class="mat-btn mat-btn--secondary"><icon name="back" /><span>Back</span></a>
     </div>
 </form>
+
+@if (Model.IsEdit && (Model.UsesAuthenticator || Model.PasskeyCount > 0))
+{
+    <div class="mat-card">
+        <div class="mat-card__head"><icon name="shield" /><span class="mat-card__title">Second step</span></div>
+        <div class="mat-card__body mat-stack">
+            <p>@Model.Input.DisplayName uses @(Model.UsesAuthenticator ? "an authenticator app" : string.Empty)@(Model.UsesAuthenticator && Model.PasskeyCount > 0 ? " and " : string.Empty)@(Model.PasskeyCount > 0 ? (Model.PasskeyCount == 1 ? "a passkey" : Model.PasskeyCount + " passkeys") : string.Empty). Lost the phone or the device? Reset it, and they sign in with the password and set it up again.</p>
+            <form method="post" asp-page-handler="ResetSecondStep" data-confirm="Reset the second step of @Model.Input.DisplayName? Their password alone then signs them in." data-confirm-ok="Reset" data-confirm-danger>
+                <input type="hidden" name="id" value="@Model.Input.Id" />
+                <button type="submit" class="mat-btn mat-btn--danger"><icon name="refresh" /><span>Reset the second step</span></button>
+            </form>
+        </div>
+    </div>
+}

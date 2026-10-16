@@ -28,7 +28,20 @@ The contract every app follows is [docs/PLATFORM.md of MatDesign](https://github
 - **OpenID Connect** with authorization code and **PKCE** (enforced), refresh tokens, sign-out at every app (end session)
 - **Single sign-on**: a session here signs a person into the next app without the form
 - Sessions live in SQLite and **survive a restart**; a person sees their devices and signs out the others
-- The tokens carry `sub` (a stable UUID), `name`, `preferred_username`, `email` and `role` (`admin` or `user`)
+- The tokens carry `sub` (a stable UUID), `name`, `preferred_username`, `email` and the `role` **of the app** (see Permissions)
+
+**Second step (optional for everyone)**
+- **Authenticator app** (TOTP, RFC 6238) with a QR code and 10 **recovery codes**, shown once
+- **Passkeys** (WebAuthn: Windows Hello, Touch ID, phone, security key): sign in **without a password**, or use one as the second step after it
+- Whoever has an authenticator app or a passkey is asked for it after the password; five wrong codes and it starts again
+- An administrator sees who uses what and resets it when a phone is lost
+
+**Permissions**
+- **Groups** (Family, Guests): apps and roles for many people at once
+- **Who may sign in** to an app: a new app is open to nobody but the administrators until people or groups are given to it (or it is opened to everyone)
+- **Who decides the roles**, per app: *Admin* (MatIdentity gives each person or group a role of the app, the token carries it) or *Managed by the app* (no role in the token, the app decides)
+- The roles of an app come from its MatApiDefinition (`roles`) or are written down; the rules are asked at every sign-in and every renewal
+- **Which apps an app may call** (machine tokens): all, or the ones chosen
 
 **Apps**
 - Add an app in the UI, or let **Mattiverse** add it when it installs one (`/api/v1/clients`, marked *Managed by mattiverse*)
@@ -54,6 +67,10 @@ The contract every app follows is [docs/PLATFORM.md of MatDesign](https://github
 | Apps | People | Activity |
 |---|---|---|
 | ![Apps](docs/images/apps.png) | ![People](docs/images/people.png) | ![Activity](docs/images/activity.png) |
+
+| Second step | Security of the account | An authenticator app |
+|---|---|---|
+| ![The second step](docs/images/second-step.png) | ![Authenticator app and passkeys](docs/images/security-on.png) | ![Setting up the app](docs/images/security-setup.png) |
 
 | Dark | Phone | Phone menu |
 |---|---|---|
@@ -142,9 +159,9 @@ platform key is `dev-key`.
 | People, sessions, devices, activity, sign everyone out | ✅ |
 | Apps in the UI and through the API for Mattiverse | ✅ |
 | The platform contract (`/api`, health, state, configure, actions) | ✅ |
+| Authenticator app (TOTP), recovery codes, passkeys (passwordless and as second step) | ✅ |
+| Groups, access and roles per app, which apps an app may call | ✅ |
 | The apps of the family signing in through it (`MATIDENTITY_*`) | next: MatSplit first, then the others |
-| Two-factor sign-in, passkeys | planned |
-| Groups (which person may open which app) | planned |
 
 ## License
 

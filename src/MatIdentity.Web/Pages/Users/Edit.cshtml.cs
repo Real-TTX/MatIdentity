@@ -19,9 +19,15 @@ public class EditModel : PageModel
     private readonly SessionService _sessions;
     private readonly TokenRevoker _revoker;
     private readonly GroupService _groups;
+    private readonly TwoFactorService _twoFactor;
+    private readonly PasskeyService _passkeys;
+    private readonly MatIdentity.Core.Activity.ActivityService _activity;
 
-    public EditModel(UserService userService, SessionService sessions, TokenRevoker revoker, GroupService groups)
+    public EditModel(UserService userService, SessionService sessions, TokenRevoker revoker, GroupService groups, TwoFactorService twoFactor, PasskeyService passkeys, MatIdentity.Core.Activity.ActivityService activity)
     {
+        _twoFactor = twoFactor;
+        _passkeys = passkeys;
+        _activity = activity;
         _groups = groups;
         _userService = userService;
         _sessions = sessions;
@@ -35,6 +41,11 @@ public class EditModel : PageModel
 
     /// <summary>Every group, for the checkboxes.</summary>
     public IReadOnlyList<Group> AllGroups { get; private set; } = [];
+
+    /// <summary>What the person uses as the second step (for the card that resets it).</summary>
+    public bool UsesAuthenticator { get; private set; }
+
+    public int PasskeyCount { get; private set; }
 
     [TempData] public string? StatusMessage { get; set; }
     [TempData] public bool IsError { get; set; }
@@ -98,9 +109,29 @@ public class EditModel : PageModel
                 IsActive = user.IsActive,
                 GroupIds = await _groups.GroupIdsOfAsync(user.Id, HttpContext.RequestAborted),
             };
+            UsesAuthenticator = user.TotpEnabled;
+            PasskeyCount = (await _passkeys.ListAsync(user.Id, HttpContext.RequestAborted)).Count;
         }
 
         return Page();
+    }
+
+    /// <summary>The phone is lost: turns the authenticator app off and removes the passkeys, so the password alone signs the person in again.</summary>
+    public async Task<IActionResult> OnPostResetSecondStepAsync(long id)
+    {
+        var ct = HttpContext.RequestAborted;
+        if (await _userService.GetAsync(id, ct) is not { } user)
+        {
+            return NotFound();
+        }
+
+        await _twoFactor.DisableAsync(user.Id, ct);
+        var removed = await _passkeys.DeleteAllAsync(user.Id, ct);
+        await _activity.WriteAsync(ActivityKind.SignOut, username: User.GetUsername(), ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString(),
+            detail: $"Second step of {user.Username} reset (authenticator app off, {removed} passkeys removed)", ct: ct);
+        StatusMessage = $"The second step of {user.DisplayName} is reset: the password alone signs them in until they set up a new one.";
+        IsError = false;
+        return RedirectToPage(new { id });
     }
 
     public async Task<IActionResult> OnPostAsync()

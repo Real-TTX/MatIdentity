@@ -157,6 +157,18 @@ public partial class WebUiTests
     }
 
     [Fact]
+    public void The_web_layer_does_not_touch_the_database()
+    {
+        // The rule of the family: models and the business layer in Core, no SQL and no DbContext in the frontend (only Program.cs registers it).
+        var problems = Directory.EnumerateFiles(Web, "*.cs", SearchOption.AllDirectories).Concat(Pages())
+            .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}") && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}") && Path.GetFileName(f) != "Program.cs")
+            .Where(f => Regex.IsMatch(File.ReadAllText(f), @"\bMatIdentityDbContext\b|\bMicrosoft\.EntityFrameworkCore\b|\bDatabase\.(Migrate|ExecuteSql|BeginTransaction)"))
+            .Select(f => Path.GetRelativePath(Web, f))
+            .ToList();
+        Assert.Empty(problems);
+    }
+
+    [Fact]
     public void Every_form_of_the_toolkit_is_novalidate()
     {
         // FORM-05: the browser shows no bubbles; the messages come from the toolkit and from the model.

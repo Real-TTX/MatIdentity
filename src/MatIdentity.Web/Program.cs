@@ -61,6 +61,7 @@ builder.Services.AddDbContext<MatIdentityDbContext>(options =>
 });
 
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddMemoryCache();
 builder.Services.AddScoped<ICurrentUserAccessor, HttpCurrentUserAccessor>();
 builder.Services.AddSingleton<SetupState>();
 builder.Services.AddSingleton<MatIdentity.Web.Support.Toolkit>();
@@ -69,7 +70,7 @@ builder.Services.AddScoped<IMatPlatformApp, IdentityPlatform>();
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<AppRolesReader>();
 builder.Services.AddMatIdentityCore();
-builder.Services.AddMatIdentityRateLimits();
+builder.Services.AddMatIdentityRateLimits(builder.Configuration);
 
 // X-Forwarded-* only from a proxy that is known (an identity server must not let anyone choose the address it limits and logs):
 // MatIdentity__TrustedProxies (addresses or networks, separated by commas), else loopback and the private networks a Docker proxy sits in.
@@ -155,6 +156,16 @@ builder.Services.AddAuthentication(AuthConstants.CookieScheme)
         options.ExpireTimeSpan = TimeSpan.FromDays(SystemConfigService.MaxSessionDays);
         options.SlidingExpiration = true;
         options.Events.OnValidatePrincipal = SessionValidation.ValidateAsync;
+    })
+    // Between the password and the second step: five minutes, then the password again.
+    .AddCookie(SignInFlow.TwoFactorScheme, options =>
+    {
+        options.Cookie.Name = "matidentity.2fa";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+        options.ExpireTimeSpan = TimeSpan.FromMinutes(5);
+        options.SlidingExpiration = false;
     });
 
 builder.Services.AddAuthorization(options =>
@@ -174,6 +185,7 @@ builder.Services.AddRazorPages(options =>
     options.Conventions.AuthorizeFolder("/");
     options.Conventions.AllowAnonymousToPage("/Setup");
     options.Conventions.AllowAnonymousToPage("/Account/Login");
+    options.Conventions.AllowAnonymousToPage("/Account/TwoFactor");
     options.Conventions.AllowAnonymousToPage("/Account/Logout");
     options.Conventions.AllowAnonymousToPage("/Account/AccessDenied");
     options.Conventions.AllowAnonymousToPage("/Error");
@@ -215,6 +227,7 @@ app.MapOidcEndpoints();
 app.MapMatPlatform(ApiAccess.RequireAsync, RateLimits.Api);
 app.MapClientApi();
 app.MapThemeApi();
+app.MapPasskeyEndpoints();
 
 // ---------------------------------------------------------------------------
 // Database migration + first-run seed

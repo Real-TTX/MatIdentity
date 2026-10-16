@@ -27,6 +27,7 @@ public class MatIdentityDbContext : DbContext
     public DbSet<User> Users => Set<User>();
     public DbSet<UserSession> UserSessions => Set<UserSession>();
     public DbSet<ActivityEntry> Activity => Set<ActivityEntry>();
+    public DbSet<Passkey> Passkeys => Set<Passkey>();
     public DbSet<Group> Groups => Set<Group>();
     public DbSet<GroupMember> GroupMembers => Set<GroupMember>();
     public DbSet<AppPolicy> AppPolicies => Set<AppPolicy>();
@@ -48,6 +49,8 @@ public class MatIdentityDbContext : DbContext
             e.Property(x => x.Email).HasMaxLength(256);
             e.Property(x => x.PasswordHash).HasMaxLength(512);
             e.Property(x => x.Theme).HasMaxLength(16).IsRequired();
+            e.Property(x => x.TotpSecret).HasMaxLength(1000);
+            e.Property(x => x.RecoveryCodeHashes).HasMaxLength(1000);
             e.Property(x => x.Role).HasConversion<int>();
             e.HasIndex(x => x.Subject).IsUnique();
             // Unique only among non-deleted rows, so a username can be reused after a soft delete.
@@ -82,6 +85,18 @@ public class MatIdentityDbContext : DbContext
             e.Property(x => x.Detail).HasMaxLength(500);
             e.HasIndex(x => x.CreateDate);
             e.HasIndex(x => x.Kind);
+            e.HasQueryFilter(x => x.UpdateState != UpdateState.Deleted);
+        });
+
+        modelBuilder.Entity<Passkey>(e =>
+        {
+            e.ToTable("Passkey");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.CredentialId).HasMaxLength(1400).IsRequired();
+            e.Property(x => x.Name).HasMaxLength(100).IsRequired();
+            e.HasIndex(x => x.CredentialId).IsUnique().HasFilter("\"UpdateState\" <> 0");
+            e.HasIndex(x => x.UserId);
+            e.HasOne(x => x.User).WithMany(u => u.Passkeys).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
             e.HasQueryFilter(x => x.UpdateState != UpdateState.Deleted);
         });
 

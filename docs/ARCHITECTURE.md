@@ -56,3 +56,32 @@ The first two are meant to become the shared package `MatPlatform` once a second
 - `X-Forwarded-*` only from known proxies (`MatIdentity__TrustedProxies`, else the private networks), so nobody picks the address that is limited and logged.
 - The image runs as the unprivileged user `app` and needs no Docker socket.
 - A secret is never stored in plain text (OpenIddict keeps a hash), shown once and never written to the activity list, a log or a cookie.
+
+## Permissions
+
+`Core/Access/PermissionService.cs` decides, for one person and one app, whether they may sign in and with which role; `/connect/authorize` asks it before
+a code is made and `/connect/token` asks it again at every code and refresh, so taking an app away ends it at the next renewal of the token.
+
+1. An administrator of MatIdentity may sign in to every app; without a grant of their own they get the first (most powerful) role of the app.
+2. A person given the app directly or through a group may sign in. Role: their own grant, else the most powerful of their groups' grants, else the default (the last role).
+3. An app opened to everyone lets every active person in with the default role.
+4. Everyone else is sent to `/Account/NoAccess`, not back to the app (the app would only show an error of its own).
+
+Per app, `RoleMode` says who decides the roles: `MatIdentity` (the claim `role` is the role of the app) or `App` (no claim `role`; the app gives rights
+itself). The roles of an app are the field `roles` of its MatApiDefinition (read on request from `<address>/api`), sent by Mattiverse through the client API,
+or written down; without any, `admin` and `user`. Machine tokens follow `AppPolicy.CallsAllApps` and `AppCallGrant`: `ClientService.SyncCallScopesAsync` writes
+the allowed `app:<id>` scopes into the permissions of the OpenIddict application.
+
+## The second step
+
+Optional for everyone. Who has an authenticator app (`TotpEnabled`) or a passkey is asked for it after the password (`TwoFactorService.NeedsSecondStepAsync`).
+Between the password and the second step there is no session, only a cookie of its own (`SignInFlow.TwoFactorScheme`, five minutes) that says whose password
+was right; five wrong codes and the person starts again. `SignInFlow.CompleteAsync` ends every way of signing in the same way (session, cookie, activity).
+
+- **TOTP** (`Core/Security/Totp.cs`, RFC 6238: HMAC-SHA1, 30 s, 6 digits, ±1 step, a step never twice). The secret is encrypted with Data Protection.
+  Ten recovery codes (50 bits each), only their SHA-256 hashes are kept, each works once.
+- **Passkeys** (`Infrastructure/PasskeyEndpoints.cs`, Fido2NetLib 4): discoverable credentials, user verification required, so a passkey alone is two factors
+  and signs in without a user name and without a password; after a password it is the second step. The relying party is the host the browser sees, so a
+  passkey belongs to the public address of MatIdentity: changing that address loses the passkeys. The options of a ceremony stay on the server (two minutes,
+  used once). The browser side is `wwwroot/js/matidentity.js`.
+- An administrator resets the second step of a person (authenticator off, passkeys removed) when a device is lost.

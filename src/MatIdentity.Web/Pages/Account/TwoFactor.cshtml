@@ -1,0 +1,40 @@
+@page
+@model MatIdentity.Web.Pages.Account.TwoFactorModel
+@{
+    Layout = "_Bare";
+    ViewData["Title"] = "Second step";
+}
+
+<div class="mat-auth__card">
+    <div class="mat-auth__brand">
+        @Ui.Logo("lg")
+        <h1>One more step</h1>
+        <p class="mat-muted">@(Model.HasAuthenticator ? "Enter the code your authenticator app shows" + (Model.HasPasskey ? ", or use your passkey." : ".") : "Use your passkey, or one of your recovery codes.")</p>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+    {
+        <div class="mat-alert mat-alert--danger" role="alert"><icon name="x-circle" /><div class="mat-alert__body">@Model.ErrorMessage</div></div>
+    }
+
+    @if (Model.HasPasskey)
+    {
+        <div class="mat-stack">
+            <button type="button" class="mat-btn mat-btn--primary mat-btn--block" data-passkey-signin="second-step" data-return-url="@Model.ReturnUrl"><icon name="key" /><span>Use a passkey</span></button>
+            <div class="mat-alert mat-alert--danger" role="alert" data-passkey-error hidden><icon name="x-circle" /><div class="mat-alert__body"></div></div>
+        </div>
+    }
+
+    <form method="post" class="mat-form" novalidate>
+        <input type="hidden" asp-for="ReturnUrl" />
+        <partial name="_ValidationSummary" />
+        <mat-field label="@(Model.HasAuthenticator ? "Code" : "Recovery code")" asp-for="Code" hint="@(Model.HasAuthenticator ? "Six digits. Lost your phone? A recovery code works here too." : "Like abcde-12345.")">
+            <input asp-for="Code" class="mat-input mat-mono" autocomplete="one-time-code" inputmode="@(Model.HasAuthenticator ? "numeric" : "text")" autofocus required data-msg-required="Please enter the code." />
+        </mat-field>
+        <div class="mat-btn-row mat-btn-row--plain">
+            <button type="submit" class="mat-btn @(Model.HasPasskey ? "mat-btn--secondary" : "mat-btn--primary") mat-btn--block"><icon name="check" /><span>Continue</span></button>
+        </div>
+    </form>
+
+    <a class="mat-btn mat-btn--ghost mat-btn--block" href="/Account/Login">Cancel</a>
+</div>

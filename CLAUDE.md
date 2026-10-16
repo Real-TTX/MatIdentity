@@ -40,16 +40,17 @@ rulebook. The accent is `#a21a50` (registered in MatDesign's `AppRegistry`; `#9d
 ```
 src/MatIdentity.Core       domain, no web types
   Entities/ Data/            User (Subject = the claim sub), UserSession, ActivityEntry; DbContext (+ OpenIddict's tables Oidc*), migrations
-  Auth/ Users/ Security/     sign-in, sessions in SQLite, PBKDF2 hasher, secret protector
+  Auth/ Users/ Security/     sign-in, sessions in SQLite, TwoFactorService (TOTP, recovery codes), PasskeyService, Totp (RFC 6238), PBKDF2 hasher, secret protector
+  Access/                    PermissionService (who may sign in where, with which role; app roles; which apps an app may call), GroupService
   Clients/                   ClientModels (ClientInfo, ClientRules), ClientService (the apps over OpenIddict, their scopes app:<id>), TokenRevoker
   Activity/                  ActivityService (the activity list, 90 days)
   Configuration/             options, AppPaths, JsonConfigStore, SystemConfig(+Service: the settings and their rules)
 src/MatIdentity.Web        Razor Pages, controls, endpoints, Program.cs (OpenIddict, cookie, rate limits, forwarded headers)
-  Infrastructure/            OidcEndpoints (authorize, token, userinfo, logout), TokenKeys, ApiAccess (X-Api-Key or token for app:matidentity),
+  Infrastructure/            OidcEndpoints (authorize, token, userinfo, logout), SignInFlow (the end of every sign-in, the second step), PasskeyEndpoints (WebAuthn), TokenKeys, ApiAccess (X-Api-Key or token for app:matidentity),
                              ClientApiEndpoints (/api/v1/clients for Mattiverse), RateLimits, session validation, setup and password guards, health check
   Platform/                  MatApiDefinition (the contract's types), PlatformEndpoints (/api, health, state, configure, actions), IdentityPlatform (MatIdentity's part)
-  Pages/                     Index (your apps; figures for an administrator), Apps/, Users/ (People), Activity/, Settings/, Account/ (Login, Logout, Profile: general,
-                             password, devices), Setup, StatusCode (also the errors of the protocol), Error
+  Pages/                     Index (your apps; figures for an administrator), Apps/ (Edit, Access), Users/ (People), Groups/, Activity/, Settings/, Account/ (Login, TwoFactor,
+                             NoAccess, Logout, Profile: general, password, devices; Security: authenticator app, recovery codes, passkeys), Setup, StatusCode (also the errors of the protocol), Error
   Support/ Controls/         Ui (icons, logo, app letters and hues), Navigation, Crumbs, Format, Authority, Toolkit; tag helpers (mat-field, icon, tab-bar), ListModels
   wwwroot/                   matui/ (the toolkit, a copy), css/matidentity.css (mi-* only), js/matidentity.js, img/ (logo, favicon, PWA icons), manifest
 tests/MatIdentity.Tests     unit tests + the site in memory
@@ -61,6 +62,8 @@ tests/MatIdentity.Tests     unit tests + the site in memory
 - Microsoft C# guidelines, file-scoped namespaces, `.editorconfig`. Few nested types; several business functions per class are fine.
 - A secret is never written in plain text anywhere: not in the database (OpenIddict hashes it), not in a cookie or TempData (a new secret is shown on the page of the POST
   itself), not in the activity list or a log.
+- No DbContext, no EF Core and no SQL in MatIdentity.Web (`WebUiTests` checks; only Program.cs registers the context): the pages and endpoints call the services of Core.
+- The sign-in limit (20 attempts a minute per address) counts POSTs only; `MatIdentity__RateLimits__SignIn` changes it (the tests raise it).
 - Whatever ends a person's access ends it everywhere: sessions here (`SessionService.InvalidateAllAsync`) **and** the refresh tokens of the apps (`TokenRevoker`).
 - The page and the API share their rules (`ClientRules`, `SystemConfigService`): never check a value only in one of them.
 - `/api/v1/clients`: `managedBy` marks what a caller created; a caller deletes only what carries its own mark.

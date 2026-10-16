@@ -20,9 +20,11 @@ public class IndexModel : PageModel
     private readonly SessionService _sessions;
     private readonly TokenRevoker _revoker;
     private readonly PermissionService _permissions;
+    private readonly PasskeyService _passkeys;
 
-    public IndexModel(UserService userService, SessionService sessions, TokenRevoker revoker, PermissionService permissions)
+    public IndexModel(UserService userService, SessionService sessions, TokenRevoker revoker, PermissionService permissions, PasskeyService passkeys)
     {
+        _passkeys = passkeys;
         _permissions = permissions;
         _userService = userService;
         _sessions = sessions;
@@ -31,12 +33,16 @@ public class IndexModel : PageModel
 
     public ListView<User> List { get; private set; } = default!;
 
+    /// <summary>How many passkeys each person has (the column "Second step").</summary>
+    public IReadOnlyDictionary<long, int> PasskeyCounts { get; private set; } = new Dictionary<long, int>();
+
     [TempData] public string? StatusMessage { get; set; }
     [TempData] public bool IsError { get; set; }
 
     public async Task OnGetAsync()
     {
         var all = await _userService.GetAllAsync(HttpContext.RequestAborted);
+        PasskeyCounts = await _passkeys.CountsAsync(HttpContext.RequestAborted);
         var q = ListQuery.Text(Request, "q");
         var role = ListQuery.Text(Request, "role");
         var sort = ListQuery.Text(Request, "sort") is { } s && SortKeys.Contains(s) ? s : "username";

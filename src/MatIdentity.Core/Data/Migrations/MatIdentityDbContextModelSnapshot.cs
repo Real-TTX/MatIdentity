@@ -325,6 +325,64 @@ namespace MatIdentity.Core.Data.Migrations
                     b.ToTable("GroupMember", (string)null);
                 });
 
+            modelBuilder.Entity("MatIdentity.Core.Entities.Passkey", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("AaGuid")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreateDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("CreateUserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("CredentialId")
+                        .IsRequired()
+                        .HasMaxLength(1400)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("LastUsedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<byte[]>("PublicKey")
+                        .IsRequired()
+                        .HasColumnType("BLOB");
+
+                    b.Property<long>("SignCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("UpdateDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("UpdateState")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("UpdateUserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CredentialId")
+                        .IsUnique()
+                        .HasFilter("\"UpdateState\" <> 0");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("Passkey", (string)null);
+                });
+
             modelBuilder.Entity("MatIdentity.Core.Entities.User", b =>
                 {
                     b.Property<long>("Id")
@@ -360,6 +418,10 @@ namespace MatIdentity.Core.Data.Migrations
                         .HasMaxLength(512)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("RecoveryCodeHashes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
                     b.Property<int>("Role")
                         .HasColumnType("INTEGER");
 
@@ -371,6 +433,16 @@ namespace MatIdentity.Core.Data.Migrations
                     b.Property<string>("Theme")
                         .IsRequired()
                         .HasMaxLength(16)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("TotpEnabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("TotpLastStep")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("TotpSecret")
+                        .HasMaxLength(1000)
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdateDate")
@@ -696,6 +768,17 @@ namespace MatIdentity.Core.Data.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("MatIdentity.Core.Entities.Passkey", b =>
+                {
+                    b.HasOne("MatIdentity.Core.Entities.User", "User")
+                        .WithMany("Passkeys")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("MatIdentity.Core.Entities.UserSession", b =>
                 {
                     b.HasOne("MatIdentity.Core.Entities.User", "User")
@@ -738,6 +821,8 @@ namespace MatIdentity.Core.Data.Migrations
 
             modelBuilder.Entity("MatIdentity.Core.Entities.User", b =>
                 {
+                    b.Navigation("Passkeys");
+
                     b.Navigation("Sessions");
                 });
 

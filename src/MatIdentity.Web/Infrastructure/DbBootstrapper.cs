@@ -5,7 +5,6 @@ using MatIdentity.Core.Data;
 using MatIdentity.Core.Entities;
 using MatIdentity.Core.Users;
 using MatIdentity.Web.Support;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 namespace MatIdentity.Web.Infrastructure;
@@ -24,8 +23,7 @@ public static class DbBootstrapper
         using var scope = services.CreateScope();
         var provider = scope.ServiceProvider;
 
-        var db = provider.GetRequiredService<MatIdentityDbContext>();
-        await db.Database.MigrateAsync();
+        await provider.GetRequiredService<DatabaseService>().MigrateAsync();
 
         await provider.GetRequiredService<ClientService>().EnsureAppScopeAsync(ClientRules.SelfId, Ui.App.Name);
         await provider.GetRequiredService<ActivityService>().PruneAsync(ActivityDays);

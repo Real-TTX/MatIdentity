@@ -26,7 +26,7 @@
             <table class="mat-table">
                 <caption class="mat-sr-only">People</caption>
                 <thead>
-                    <tr><th scope="col">Username</th><th scope="col" class="mat-hide-sm">Display name</th><th scope="col" class="mat-hide-sm">E-mail</th><th scope="col">Role</th><th scope="col">Status</th><th scope="col" class="mat-hide-sm">Last login</th><th scope="col"><span class="mat-sr-only">Actions</span></th></tr>
+                    <tr><th scope="col">Username</th><th scope="col" class="mat-hide-sm">Display name</th><th scope="col" class="mat-hide-sm">E-mail</th><th scope="col">Role</th><th scope="col">Status</th><th scope="col" class="mat-hide-sm">Second step</th><th scope="col" class="mat-hide-sm">Last login</th><th scope="col"><span class="mat-sr-only">Actions</span></th></tr>
                 </thead>
                 <tbody>
                     @foreach (var u in list.Items)
@@ -45,6 +45,12 @@
                                 {
                                     <span class="mat-pill">Inactive</span>
                                 }
+                            </td>
+                            <td data-label="Second step" class="mat-hide-sm">
+                                @{ var keys = Model.PasskeyCounts.GetValueOrDefault(u.Id); }
+                                @if (u.TotpEnabled) { <span class="mat-pill mat-pill--ok">App</span> }
+                                @if (keys > 0) { <span class="mat-pill mat-pill--ok">@(keys == 1 ? "Passkey" : keys + " passkeys")</span> }
+                                @if (!u.TotpEnabled && keys == 0) { <span class="mat-muted">–</span> }
                             </td>
                             <td data-label="Last login" class="mat-hide-sm mat-muted mat-nowrap mat-mono">@(u.LastLoginAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "–")</td>
                             <td class="mat-table__cell-actions">

@@ -20,6 +20,8 @@ public sealed class IdentityFactory : WebApplicationFactory<Program>
         // Program reads these before the host is built, so they are given as environment variables (one collection at a time, see TestCollection).
         Environment.SetEnvironmentVariable("MatIdentity__DataPath", _data);
         Environment.SetEnvironmentVariable("MAT_API_KEY", ApiKey);
+        // All requests of the tests come from one address: the limit of the sign-in (20 a minute) would stop them.
+        Environment.SetEnvironmentVariable("MatIdentity__RateLimits__SignIn", "10000");
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder) => builder.UseEnvironment("Development");

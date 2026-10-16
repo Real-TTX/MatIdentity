@@ -25,6 +25,10 @@ public static class ServiceCollectionExtensions
         // Per-request services (depend on the scoped DbContext and on the OpenIddict managers).
         services.AddScoped<AuthService>();
         services.AddScoped<SessionService>();
+        services.AddScoped<TwoFactorService>();
+        services.AddScoped<PasskeyService>();
+        services.AddScoped<MatIdentity.Core.Data.DatabaseService>();
+        services.AddSingleton(TimeProvider.System);
         services.AddScoped<UserService>();
         services.AddScoped<ActivityService>();
         services.AddScoped<ClientService>();

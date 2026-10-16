@@ -63,3 +63,8 @@
 
 /* A choice that belongs to the check above it (the apps an app may call). */
 .mi-indent { padding-left: var(--mat-space-6); }
+
+/* ---- The account: the QR code of the authenticator app (always dark on white, also in the dark theme: a camera needs the contrast) and the recovery codes ---- */
+.mi-qr { align-self: flex-start; padding: var(--mat-space-3); background: var(--mat-picker-light); /* the toolkit's white that stays white in the dark theme */ border: 1px solid var(--mat-border); border-radius: var(--mat-radius); line-height: 0; }
+.mi-qr img { display: block; width: 240px; max-width: 100%; height: auto; }
+.mi-codes { margin: 0; columns: 2; font-size: var(--mat-fs-md); letter-spacing: .05em; }

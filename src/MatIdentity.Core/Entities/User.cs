@@ -31,5 +31,19 @@ public class User : AuditableEntity
     /// <summary>Preferred theme: system, light or dark (stored in the browser as well, so it applies before login).</summary>
     public string Theme { get; set; } = "system";
 
+    /// <summary>The secret of the authenticator app (Base32), encrypted with Data Protection; set while setting it up and while it is on.</summary>
+    public string? TotpSecret { get; set; }
+
+    /// <summary>The authenticator app is confirmed: a sign-in with the password asks for a code.</summary>
+    public bool TotpEnabled { get; set; }
+
+    /// <summary>The last 30-second step a code was used for, so no code works twice.</summary>
+    public long TotpLastStep { get; set; }
+
+    /// <summary>The hashes (SHA-256, hex) of the unused recovery codes, separated by spaces; each one works once.</summary>
+    public string? RecoveryCodeHashes { get; set; }
+
     public ICollection<UserSession> Sessions { get; set; } = new List<UserSession>();
+
+    public ICollection<Passkey> Passkeys { get; set; } = new List<Passkey>();
 }

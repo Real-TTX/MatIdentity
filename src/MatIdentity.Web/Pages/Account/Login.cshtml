@@ -22,6 +22,11 @@
         <div class="mat-alert mat-alert--danger" role="alert"><icon name="x-circle" /><div class="mat-alert__body">@Model.ErrorMessage</div></div>
     }
 
+    <div class="mat-stack">
+        <button type="button" class="mat-btn mat-btn--secondary mat-btn--block" data-passkey-signin="passkey" data-return-url="@(Model.ReturnUrl ?? "/")"><icon name="key" /><span>Sign in with a passkey</span></button>
+        <div class="mat-alert mat-alert--danger" role="alert" data-passkey-error hidden><icon name="x-circle" /><div class="mat-alert__body"></div></div>
+    </div>
+
     <form method="post" class="mat-form" novalidate>
         <input type="hidden" asp-for="ReturnUrl" />
         <partial name="_ValidationSummary" />

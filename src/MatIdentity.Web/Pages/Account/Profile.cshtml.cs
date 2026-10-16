@@ -50,13 +50,17 @@ public class ProfileModel : PageModel
     /// <summary>general, password or sessions; the password tab when a change is required or the last submit failed.</summary>
     public string ActiveTab => MustChange || Tab == "password" || !ModelState.IsValid ? "password" : Tab == "sessions" ? "sessions" : "general";
 
-    public TabBarModel Tabs => new()
+    public TabBarModel Tabs => TabsFor(ActiveTab);
+
+    /// <summary>The tabs of the account (this page and the security page).</summary>
+    public static TabBarModel TabsFor(string active) => new()
     {
         Tabs =
         [
-            new TabItem { Title = "General", Href = "/Account/Profile", Icon = "user", Active = ActiveTab == "general" },
-            new TabItem { Title = "Password", Href = "/Account/Profile?tab=password", Icon = "key", Active = ActiveTab == "password" },
-            new TabItem { Title = "Devices", Href = "/Account/Profile?tab=sessions", Icon = "monitor", Active = ActiveTab == "sessions" },
+            new TabItem { Title = "General", Href = "/Account/Profile", Icon = "user", Active = active == "general" },
+            new TabItem { Title = "Password", Href = "/Account/Profile?tab=password", Icon = "key", Active = active == "password" },
+            new TabItem { Title = "Security", Href = "/Account/Security", Icon = "shield", Active = active == "security" },
+            new TabItem { Title = "Devices", Href = "/Account/Profile?tab=sessions", Icon = "monitor", Active = active == "sessions" },
         ],
     };
 

@@ -8,7 +8,6 @@ using MatIdentity.Core.Data;
 using MatIdentity.Core.Entities;
 using MatIdentity.Core.Users;
 using MatIdentity.Web.Support;
-using Microsoft.EntityFrameworkCore;
 
 namespace MatIdentity.Web.Platform;
 
@@ -21,7 +20,7 @@ public sealed class IdentityPlatform : IMatPlatformApp
     private static readonly ActivityKind[] SignIns = [ActivityKind.SignIn];
     private static readonly ActivityKind[] Failures = [ActivityKind.SignInFailed];
 
-    private readonly MatIdentityDbContext _db;
+    private readonly DatabaseService _database;
     private readonly UserService _users;
     private readonly ClientService _clients;
     private readonly SessionService _sessions;
@@ -30,10 +29,10 @@ public sealed class IdentityPlatform : IMatPlatformApp
     private readonly ApiAccess _access;
     private readonly TokenRevoker _revoker;
 
-    public IdentityPlatform(MatIdentityDbContext db, UserService users, ClientService clients, SessionService sessions, ActivityService activity, SystemConfigService config, ApiAccess access, TokenRevoker revoker)
+    public IdentityPlatform(DatabaseService database, UserService users, ClientService clients, SessionService sessions, ActivityService activity, SystemConfigService config, ApiAccess access, TokenRevoker revoker)
     {
         _revoker = revoker;
-        _db = db;
+        _database = database;
         _users = users;
         _clients = clients;
         _sessions = sessions;
@@ -106,15 +105,7 @@ public sealed class IdentityPlatform : IMatPlatformApp
     public async Task<MatHealth> HealthAsync(CancellationToken ct)
     {
         var checks = new List<MatHealthCheck>();
-        try
-        {
-            await _db.Database.ExecuteSqlRawAsync("SELECT 1", ct);
-            checks.Add(new MatHealthCheck("database", "ok"));
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            checks.Add(new MatHealthCheck("database", "down", "The database cannot be read."));
-        }
+        checks.Add(await _database.CanReadAsync(ct) ? new MatHealthCheck("database", "ok") : new MatHealthCheck("database", "down", "The database cannot be read."));
 
         if (await _users.CountActiveAdminsAsync(ct) == 0 && await _users.CountAsync(ct) > 0)
         {

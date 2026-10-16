@@ -1,0 +1,117 @@
+@page
+@model MatIdentity.Web.Pages.Account.SecurityModel
+@{
+    ViewData["Title"] = "Account";
+    ViewData["PageSub"] = "Who you are in all Mat apps, your password and where you are signed in.";
+    ViewData["Crumbs"] = Crumbs.Of(("Account", "/Account/Profile"), ("Security", null));
+    ViewData["Width"] = "narrow";
+}
+
+<tab-bar model="Model.Tabs" label="Account" />
+
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="mat-alert mat-alert--danger" role="alert"><icon name="x-circle" /><div class="mat-alert__body">@Model.ErrorMessage</div></div>
+}
+
+@if (Model.NewRecoveryCodes is not null)
+{
+    <div class="mat-card">
+        <div class="mat-card__head"><icon name="key" /><span class="mat-card__title">Your recovery codes</span></div>
+        <div class="mat-card__body mat-stack">
+            <div class="mat-alert mat-alert--warning" role="alert"><icon name="alert" /><div class="mat-alert__body"><strong>Shown only now.</strong> Keep them where you keep passwords. Each one signs you in once when your phone is gone.</div></div>
+            <pre class="mat-code mi-codes" id="recovery-codes">@string.Join("\n", Model.NewRecoveryCodes)</pre>
+            <div class="mat-btn-row mat-btn-row--plain">
+                <button type="button" class="mat-btn mat-btn--primary" data-copy="#recovery-codes"><icon name="copy" /><span>Copy the codes</span></button>
+                <a class="mat-btn mat-btn--secondary" href="/Account/Security"><icon name="check" /><span>Done</span></a>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="mat-card">
+        <div class="mat-card__head"><icon name="shield" /><span class="mat-card__title">Authenticator app</span></div>
+        <div class="mat-card__body mat-stack">
+            @if (Model.Me.TotpEnabled)
+            {
+                <p><span class="mat-pill mat-pill--ok">On</span> After your password, MatIdentity asks for the code of your app. @Model.RecoveryCodesLeft recovery codes are left.</p>
+                <form method="post" class="mat-form" novalidate>
+                    <mat-field label="Your password" for-id="sec-password" hint="To turn the app off or to make new recovery codes.">
+                        <input type="password" id="sec-password" name="password" class="mat-input" autocomplete="current-password" required data-msg-required="Please enter your password." />
+                    </mat-field>
+                    <div class="mat-btn-row">
+                        <button type="submit" class="mat-btn mat-btn--secondary" asp-page-handler="RenewCodes"><icon name="refresh" /><span>New recovery codes</span></button>
+                        <span class="mat-btn-row__spacer"></span>
+                        <button type="submit" class="mat-btn mat-btn--danger mat-btn--end" asp-page-handler="Disable" data-confirm="Turn the authenticator app off? Your password alone then signs you in, unless you have a passkey." data-confirm-ok="Turn off" data-confirm-danger><icon name="x" /><span>Turn off</span></button>
+                    </div>
+                </form>
+            }
+            else if (Model.SetupSecret is not null)
+            {
+                <p>Scan the code with your authenticator app (Microsoft Authenticator, Google Authenticator, 1Password, Bitwarden, ...), then enter the code it shows.</p>
+                <div class="mi-qr"><img src="@Model.SetupQr" alt="QR code for your authenticator app" width="240" height="240" /></div>
+                <p class="mat-hint">Cannot scan? Type this key into the app: <span class="mat-mono">@MatIdentity.Web.Pages.Account.SecurityModel.Grouped(Model.SetupSecret)</span></p>
+                <form method="post" asp-page-handler="Confirm" class="mat-form" novalidate>
+                    <mat-field label="Code from the app" for-id="sec-code">
+                        <input id="sec-code" name="code" class="mat-input mat-mono" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9 ]{6,7}" required autofocus data-msg-required="Please enter the code." data-msg-pattern="Six digits." />
+                    </mat-field>
+                    <div class="mat-btn-row">
+                        <button type="submit" class="mat-btn mat-btn--primary"><icon name="check" /><span>Turn on</span></button>
+                        <a href="/Account/Security" class="mat-btn mat-btn--secondary"><icon name="back" /><span>Back</span></a>
+                    </div>
+                </form>
+            }
+            else
+            {
+                <p class="mat-muted">Optional. With an app on your phone a stolen password is not enough to sign in as you.</p>
+                <form method="post" asp-page-handler="Begin">
+                    <button type="submit" class="mat-btn mat-btn--primary"><icon name="plus" /><span>Set up an authenticator app</span></button>
+                </form>
+            }
+        </div>
+    </div>
+
+    <div class="mat-card">
+        <div class="mat-card__head"><icon name="key" /><span class="mat-card__title">Passkeys</span></div>
+        <div class="mat-card__body mat-stack">
+            <p class="mat-muted">Sign in with your fingerprint, your face or your device PIN instead of a password. A passkey also counts as the second step after your password.</p>
+            @if (Model.Passkeys.Count > 0)
+            {
+                <div class="mat-table-wrap">
+                    <table class="mat-table">
+                        <caption class="mat-sr-only">Your passkeys</caption>
+                        <thead><tr><th scope="col">Name</th><th scope="col" class="mat-hide-sm">Added</th><th scope="col">Last used</th><th scope="col"><span class="mat-sr-only">Actions</span></th></tr></thead>
+                        <tbody>
+                            @foreach (var p in Model.Passkeys)
+                            {
+                                <tr>
+                                    <td data-label="Name"><span class="mat-table__name">@p.Name</span></td>
+                                    <td data-label="Added" class="mat-hide-sm mat-nowrap">@Format.DateTimeLocal(p.CreateDate)</td>
+                                    <td data-label="Last used" class="mat-nowrap">@(p.LastUsedAt is { } used ? Format.Ago(used) : "never")</td>
+                                    <td class="mat-table__cell-actions">
+                                        <div class="mat-table__actions">
+                                            <form method="post" asp-page-handler="DeletePasskey" data-confirm="Remove the passkey @p.Name? Delete it on the device too." data-confirm-ok="Remove" data-confirm-danger>
+                                                <input type="hidden" name="id" value="@p.Id" />
+                                                <button type="submit" class="mat-btn mat-btn--danger mat-btn--icon mat-btn--sm" aria-label="Remove @p.Name" data-tip="Remove"><icon name="trash" /></button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            <div class="mat-form" data-passkey-register>
+                <mat-field label="Name of the new passkey" for-id="passkey-name" hint="So you know which device it is.">
+                    <input id="passkey-name" class="mat-input" maxlength="100" placeholder="Laptop" />
+                </mat-field>
+                <div class="mat-alert mat-alert--danger" role="alert" data-passkey-error hidden><icon name="x-circle" /><div class="mat-alert__body"></div></div>
+                <div class="mat-btn-row mat-btn-row--plain">
+                    <button type="button" class="mat-btn mat-btn--primary" data-passkey-add><icon name="plus" /><span>Add a passkey</span></button>
+                </div>
+            </div>
+        </div>
+    </div>
+}

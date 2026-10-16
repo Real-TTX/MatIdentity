@@ -23,9 +23,11 @@ public class LoginModel : PageModel
     private readonly SessionService _sessionService;
     private readonly ActivityService _activity;
     private readonly SystemConfigService _config;
+    private readonly TwoFactorService _twoFactor;
 
-    public LoginModel(AuthService authService, SessionService sessionService, ActivityService activity, SystemConfigService config)
+    public LoginModel(AuthService authService, SessionService sessionService, ActivityService activity, SystemConfigService config, TwoFactorService twoFactor)
     {
+        _twoFactor = twoFactor;
         _authService = authService;
         _sessionService = sessionService;
         _activity = activity;
@@ -95,18 +97,14 @@ public class LoginModel : PageModel
             return Page();
         }
 
-        // A new sign-in replaces the session this browser had (another person may have used it).
-        if (User.GetSessionToken() is { } previous)
+        // An authenticator app or a passkey: the password alone is not enough, the second step comes first.
+        if (await _twoFactor.NeedsSecondStepAsync(result.User, HttpContext.RequestAborted))
         {
-            await _sessionService.InvalidateAsync(previous, HttpContext.RequestAborted);
+            await SignInFlow.BeginSecondStepAsync(HttpContext, result.User, Input.RememberMe);
+            return RedirectToPage("/Account/TwoFactor", new { returnUrl = SafeReturnUrl() });
         }
 
-        var session = await _sessionService.CreateAsync(result.User.Id, Request.Headers.UserAgent.ToString(), ip, HttpContext.RequestAborted);
-        await HttpContext.SignInAsync(
-            AuthConstants.CookieScheme,
-            PrincipalFactory.Build(result.User, session.Token),
-            new AuthenticationProperties { IsPersistent = Input.RememberMe });
-        await _activity.WriteAsync(ActivityKind.SignIn, result.User, ipAddress: ip, ct: HttpContext.RequestAborted);
+        await SignInFlow.CompleteAsync(HttpContext, result.User, Input.RememberMe, how: "with the password");
 
         // A forced password change lands on the account page via the guard middleware (and comes back here afterwards).
         return LocalRedirect(SafeReturnUrl());
