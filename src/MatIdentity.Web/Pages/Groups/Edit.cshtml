@@ -25,7 +25,7 @@
                 {
                     <label class="mat-check">
                         <input type="checkbox" name="Input.MemberIds" value="@p.Id" checked="@Model.Input.MemberIds.Contains(p.Id)" />
-                        <span class="mat-check__text">@p.DisplayName <span class="mat-muted">(@p.Username)</span></span>
+                        <span class="mat-check__text"><span>@p.DisplayName</span><small class="mat-muted">@p.Username</small></span>
                     </label>
                 }
                 <span class="mat-error"></span>
