@@ -294,7 +294,7 @@ dotnet test                           # unit tests and the whole site in memory:
 ./scripts/update-matui.ps1            # bring a newer MatUi from a running MatDesign into wwwroot/matui
 ```
 
-The dev stack is the app plus a SQLite web viewer on `http://localhost:2309`. In `Development` the account **`tester` / `Tester123!`** exists and the
+The dev stack is the app plus a SQLite web viewer on `http://localhost:2309`. In `Development` the account **`admin@example.com` / `Start12345`** exists and the
 platform key is `dev-key`.
 
 ### Branches and versions

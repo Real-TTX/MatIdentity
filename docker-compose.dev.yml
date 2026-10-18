@@ -22,7 +22,7 @@ services:
     ports:
       - "${MATIDENTITY_PORT:-2300}:2300"
     environment:
-      # Development seeds a ready-to-use account (tester / Tester123!) so testing never touches the real admin.
+      # Development seeds a ready-to-use account (admin@example.com / Start12345) so testing never touches the real admin.
       ASPNETCORE_ENVIRONMENT: Development
       # The key of the platform API, for trying /api/state and /api/configure with curl.
       MAT_API_KEY: ${MATIDENTITY_API_KEY:-dev-key}

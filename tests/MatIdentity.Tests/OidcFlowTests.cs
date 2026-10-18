@@ -1,3 +1,4 @@
+using MatIdentity.Web.Infrastructure;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -63,15 +64,15 @@ public sealed class OidcFlowTests
         Assert.False(string.IsNullOrEmpty(tokens.GetProperty("refresh_token").GetString()));
 
         var identity = Claims(tokens.GetProperty("id_token").GetString()!);
-        Assert.Equal("tester", identity.GetProperty("preferred_username").GetString());
+        Assert.Equal(DevAccount.Username, identity.GetProperty("preferred_username").GetString());
         Assert.Equal("admin", identity.GetProperty("role").GetString());
-        Assert.Equal("tester@example.com", identity.GetProperty("email").GetString());
+        Assert.Equal(DevAccount.Username, identity.GetProperty("email").GetString());
 
         // The user info answers the access token.
         var api = _site.CreateClient();
         api.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokens.GetProperty("access_token").GetString());
         using var info = JsonDocument.Parse(await api.GetStringAsync("/connect/userinfo"));
-        Assert.Equal("Test User", info.RootElement.GetProperty("name").GetString());
+        Assert.Equal("Admin", info.RootElement.GetProperty("name").GetString());
         Assert.Equal(identity.GetProperty("sub").GetString(), info.RootElement.GetProperty("sub").GetString());
 
         // Single sign-on: the second time the code comes without the form.

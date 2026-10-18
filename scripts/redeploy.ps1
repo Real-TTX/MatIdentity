@@ -42,7 +42,7 @@ try {
 
     Write-Host ''
     Write-Host "MatIdentity local-$($env:MATIDENTITY_BUILD_DATE) is running on http://localhost:$Port" -ForegroundColor Green
-    Write-Host 'Dev login: tester / Tester123!   |   SQLite web: http://localhost:2309' -ForegroundColor DarkGray
+    Write-Host 'Dev login: admin@example.com / Start12345   |   SQLite web: http://localhost:2309' -ForegroundColor DarkGray
 }
 finally {
     Pop-Location

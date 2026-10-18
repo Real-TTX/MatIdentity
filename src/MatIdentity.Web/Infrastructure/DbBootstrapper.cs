@@ -42,10 +42,17 @@ public static class DbBootstrapper
         }
 
         // Local/dev only (never in Production): a ready-to-use test account so testing never touches the real admin.
-        if (environment.IsDevelopment() && !await users.UsernameExistsAsync("tester"))
+        if (environment.IsDevelopment() && !await users.UsernameExistsAsync(DevAccount.Username))
         {
-            await users.CreateAsync("tester", "Test User", "tester@example.com", "Tester123!", UserRole.Admin, mustChangePassword: false);
-            logger.LogWarning("Seeded local test account 'tester' / 'Tester123!' (Development only).");
+            await users.CreateAsync(DevAccount.Username, "Admin", DevAccount.Username, DevAccount.Password, UserRole.Admin, mustChangePassword: false);
+            logger.LogWarning("Seeded local test account '{Username}' (Development only).", DevAccount.Username);
         }
     }
+}
+
+/// <summary>The ready-to-use account of a Development start (never in Production): its user name is also its e-mail address.</summary>
+public static class DevAccount
+{
+    public const string Username = "admin@example.com";
+    public const string Password = "Start12345";
 }

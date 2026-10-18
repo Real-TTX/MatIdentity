@@ -25,7 +25,7 @@ rulebook. The accent is `#a21a50` (registered in MatDesign's `AppRegistry`; `#9d
   and `PlatformApiTests` (the contract, access, configure, the client API, every page opens). The site tests share one collection (environment variables).
 - **Run / test the app: always rebuild the container and redeploy the stack** (project rule): `./scripts/redeploy.ps1` (`-Fresh` wipes the volume and with it the token keys,
   `-Port` changes the host port). Dev stack: `docker-compose.dev.yml` (app + `sqlite-web` on 2309, subnet `10.253.24.0/24` because the PC has its Docker address pools used up).
-  In `Development` the account `tester` / `Tester123!` exists and `MAT_API_KEY` is `dev-key`.
+  In `Development` the account `admin@example.com` / `Start12345` exists and `MAT_API_KEY` is `dev-key`.
 - **Release stack:** `docker-compose.yml`, image `ghcr.io/real-ttx/matidentity`, one service and one volume: keep it that simple.
 - **The volume and a non-root image:** the image has a placeholder file in `/data` so that Docker copies the folder's owner (`app`) into a new named volume; without it the
   volume is root's and the app cannot write. `sqlite-web` (root) starts only when MatIdentity is healthy, else it creates an empty database first.

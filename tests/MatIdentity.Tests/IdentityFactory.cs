@@ -1,3 +1,4 @@
+using MatIdentity.Web.Infrastructure;
 using System.Net;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Hosting;
@@ -6,7 +7,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 namespace MatIdentity.Tests;
 
 /// <summary>
-/// The whole site in memory on its own empty data folder, in Development (so the account <c>tester</c> / <c>Tester123!</c> exists) and with the
+/// The whole site in memory on its own empty data folder, in Development (so the account <c>admin@example.com</c> / <c>Start12345</c> exists) and with the
 /// platform key <see cref="ApiKey"/>. Shared by the tests of one collection; the folder is removed at the end.
 /// </summary>
 public sealed class IdentityFactory : WebApplicationFactory<Program>
@@ -36,8 +37,8 @@ public sealed class IdentityFactory : WebApplicationFactory<Program>
         return client;
     }
 
-    /// <summary>Signs <c>tester</c> in through the form (with its anti-forgery token) and returns where the form sends the browser.</summary>
-    public static async Task<string> SignInAsync(HttpClient browser, string loginUrl, string username = "tester", string password = "Tester123!")
+    /// <summary>Signs the development account in through the form (with its anti-forgery token) and returns where the form sends the browser.</summary>
+    public static async Task<string> SignInAsync(HttpClient browser, string loginUrl, string username = DevAccount.Username, string password = DevAccount.Password)
     {
         var form = await browser.GetStringAsync(loginUrl);
         var token = Regex.Match(form, @"name=""__RequestVerificationToken"" type=""hidden"" value=""([^""]+)""").Groups[1].Value;
