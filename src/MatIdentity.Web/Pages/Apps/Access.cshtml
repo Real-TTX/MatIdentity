@@ -15,7 +15,7 @@
     <div class="mat-alert mat-alert--info" role="status"><icon name="info" /><div class="mat-alert__body">People do not sign in to this app (it only calls other apps), so these rules have no effect.</div></div>
 }
 
-<form method="post" asp-page-handler="Rules" class="mat-form" novalidate>
+<form method="post" asp-page-handler="Rules" asp-route-id="@Model.Id" class="mat-form" novalidate>
     <div class="mat-card">
         <div class="mat-card__head"><icon name="shield" /><span class="mat-card__title">Rules</span></div>
         <div class="mat-card__body mat-stack">
@@ -67,7 +67,7 @@
                                 @if (byMatIdentity)
                                 {
                                     <td data-label="Role">
-                                        <form method="post" asp-page-handler="ChangeRole" data-autosubmit>
+                                        <form method="post" asp-page-handler="ChangeRole" asp-route-id="@Model.Id" data-autosubmit>
                                             <input type="hidden" name="grantId" value="@g.Id" />
                                             <select class="mat-select" name="role" aria-label="Role of @(g.Group?.Name ?? g.User!.DisplayName)">
                                                 <option value="">Default (@Model.Roles[^1].Label)</option>
@@ -81,7 +81,7 @@
                                 }
                                 <td class="mat-table__cell-actions">
                                     <div class="mat-table__actions">
-                                        <form method="post" asp-page-handler="Revoke" data-confirm="Take @Model.App.DisplayName away from @(g.Group?.Name ?? g.User!.DisplayName)?" data-confirm-ok="Take away" data-confirm-danger>
+                                        <form method="post" asp-page-handler="Revoke" asp-route-id="@Model.Id" data-confirm="Take @Model.App.DisplayName away from @(g.Group?.Name ?? g.User!.DisplayName)?" data-confirm-ok="Take away" data-confirm-danger>
                                             <input type="hidden" name="grantId" value="@g.Id" />
                                             <button type="submit" class="mat-btn mat-btn--danger mat-btn--icon mat-btn--sm" aria-label="Take away from @(g.Group?.Name ?? g.User!.DisplayName)" data-tip="Take away"><icon name="trash" /></button>
                                         </form>
@@ -100,7 +100,7 @@
 
         @if (Model.Candidates.Count > 0)
         {
-            <form method="post" asp-page-handler="Grant" class="mat-form" novalidate>
+            <form method="post" asp-page-handler="Grant" asp-route-id="@Model.Id" class="mat-form" novalidate>
                 <div class="mat-form__grid">
                     <mat-field label="Give it to" for-id="grant-who">
                         <select class="mat-select" id="grant-who" name="principal" required data-msg-required="Choose a person or a group.">
@@ -134,7 +134,7 @@
 
 @if (byMatIdentity)
 {
-    <form method="post" asp-page-handler="Roles" class="mat-form" novalidate>
+    <form method="post" asp-page-handler="Roles" asp-route-id="@Model.Id" class="mat-form" novalidate>
         <partial name="_ValidationSummary" />
         <div class="mat-card">
             <div class="mat-card__head"><icon name="key" /><span class="mat-card__title">Roles of the app</span></div>
@@ -147,7 +147,7 @@
                     <button type="submit" class="mat-btn mat-btn--primary"><icon name="save" /><span>Save roles</span></button>
                     @if (!string.IsNullOrEmpty(Model.App.HomeUrl))
                     {
-                        <button type="submit" class="mat-btn mat-btn--secondary" asp-page-handler="ReadRoles" formnovalidate><icon name="refresh" /><span>Read from the app</span></button>
+                        <button type="submit" class="mat-btn mat-btn--secondary" asp-page-handler="ReadRoles" asp-route-id="@Model.Id" formnovalidate><icon name="refresh" /><span>Read from the app</span></button>
                     }
                 </div>
             </div>

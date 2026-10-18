@@ -115,7 +115,7 @@ else
             @if (Model.IsEdit && !Model.Input.IsPublic)
             {
                 <span class="mat-btn-row__spacer"></span>
-                <button type="submit" class="mat-btn mat-btn--danger mat-btn--end" asp-page-handler="RenewSecret" formnovalidate data-confirm="Make a new secret? The old one stops working at once; the app needs the new one." data-confirm-ok="New secret" data-confirm-danger><icon name="refresh" /><span>New secret</span></button>
+                <button type="submit" class="mat-btn mat-btn--danger mat-btn--end" asp-page-handler="RenewSecret" asp-route-id="@Model.Id" formnovalidate data-confirm="Make a new secret? The old one stops working at once; the app needs the new one." data-confirm-ok="New secret" data-confirm-danger><icon name="refresh" /><span>New secret</span></button>
             }
         </div>
     </form>

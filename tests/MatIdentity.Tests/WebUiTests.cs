@@ -187,4 +187,33 @@ public partial class WebUiTests
 
         Assert.Empty(problems);
     }
+
+    [Fact]
+    public void A_handler_of_a_page_that_reads_its_id_from_the_address_keeps_the_id()
+    {
+        // asp-page-handler writes an address of its own (?handler=X) and drops the query of the page: without asp-route-id the post
+        // arrives without the id of the app, and the page cannot find what it was showing.
+        var problems = new List<string>();
+        foreach (var page in Pages())
+        {
+            var model = page + ".cs";
+            if (!File.Exists(model) || !File.ReadAllText(model).Contains("SupportsGet = true, Name = \"id\"", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            foreach (Match tag in HandlerTagRegex().Matches(File.ReadAllText(page)))
+            {
+                if (!tag.Value.Contains("asp-route-id=", StringComparison.Ordinal))
+                {
+                    problems.Add($"{Path.GetFileName(page)}: {tag.Value[..Math.Min(tag.Value.Length, 80)]}");
+                }
+            }
+        }
+
+        Assert.Empty(problems);
+    }
+
+    [GeneratedRegex(@"<(?:form|button)\b[^>]*\basp-page-handler=""[^""]+""[^>]*>")]
+    private static partial Regex HandlerTagRegex();
 }
