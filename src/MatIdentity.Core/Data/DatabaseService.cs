@@ -14,6 +14,9 @@ public sealed class DatabaseService
 
     public Task MigrateAsync(CancellationToken ct = default) => _db.Database.MigrateAsync(ct);
 
+    /// <summary>Removes the migration lock of a process that was stopped while it migrated (see <see cref="MigrationLock"/>); returns whether there was one.</summary>
+    public Task<bool> ReleaseStaleMigrationLockAsync(CancellationToken ct = default) => MigrationLock.ReleaseStaleAsync(_db.Database, ct);
+
     /// <summary>True when the database can be read.</summary>
     public async Task<bool> CanReadAsync(CancellationToken ct = default)
     {

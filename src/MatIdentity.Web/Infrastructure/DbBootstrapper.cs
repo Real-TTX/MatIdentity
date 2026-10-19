@@ -10,8 +10,8 @@ using Microsoft.Extensions.Options;
 namespace MatIdentity.Web.Infrastructure;
 
 /// <summary>
-/// At start: applies the EF Core migrations, makes sure MatIdentity's own API has its scope (<c>app:matidentity</c>), keeps the activity list
-/// small, and seeds the first administrator on an empty database (headless setups only) and the test account in Development.
+/// At start: removes a migration lock left behind by a stopped process, applies the EF Core migrations, makes sure MatIdentity's own API has its scope
+/// (<c>app:matidentity</c>), keeps the activity list small, and seeds the first administrator on an empty database (headless setups only) and the test account in Development.
 /// </summary>
 public static class DbBootstrapper
 {
@@ -23,7 +23,13 @@ public static class DbBootstrapper
         using var scope = services.CreateScope();
         var provider = scope.ServiceProvider;
 
-        await provider.GetRequiredService<DatabaseService>().MigrateAsync();
+        var database = provider.GetRequiredService<DatabaseService>();
+        if (await database.ReleaseStaleMigrationLockAsync())
+        {
+            logger.LogWarning("Removed a migration lock left behind by a process that was stopped while it migrated the database.");
+        }
+
+        await database.MigrateAsync();
 
         await provider.GetRequiredService<ClientService>().EnsureAppScopeAsync(ClientRules.SelfId, Ui.App.Name);
         await provider.GetRequiredService<ActivityService>().PruneAsync(ActivityDays);

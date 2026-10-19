@@ -19,8 +19,8 @@ rulebook. The accent is `#a21a50` (registered in MatDesign's `AppRegistry`; `#9d
 ## Build / run / test
 
 - **Build:** `dotnet build MatIdentity.slnx` (note: `.slnx`). SDK 10 (see `global.json`). Expected: 0 warnings.
-- **Tests:** `dotnet test`: xunit. `ClientRulesTests` (rules without the site), `WebUiTests` (the source of the pages: icons of the sprite, no inline style or script,
-  tokens only in the stylesheet), and the whole site in memory (`IdentityFactory`, a `WebApplicationFactory` on its own temp data folder, Development, key `test-key-…`):
+- **Tests:** `dotnet test`: xunit. `ClientRulesTests` (rules without the site), `MigrationLockTests` (a stale EF migration lock is removed at start),
+  `WebUiTests` (the source of the pages: icons of the sprite, no inline style or script, tokens only in the stylesheet), and the whole site in memory (`IdentityFactory`, a `WebApplicationFactory` on its own temp data folder, Development, key `test-key-…`):
   `OidcFlowTests` (discovery, code + PKCE end to end with the real sign-in form, single sign-on, refresh, machine tokens and audiences, wrong secret = 401)
   and `PlatformApiTests` (the contract, access, configure, the client API, every page opens). The site tests share one collection (environment variables).
 - **Run / test the app: always rebuild the container and redeploy the stack** (project rule): `./scripts/redeploy.ps1` (`-Fresh` wipes the volume and with it the token keys,
