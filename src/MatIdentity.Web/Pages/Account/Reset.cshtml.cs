@@ -23,9 +23,11 @@ public class ResetModel : PageModel
     private readonly SessionService _sessions;
     private readonly TokenRevoker _revoker;
     private readonly ActivityService _activity;
+    private readonly MatIdentity.Core.Configuration.SystemConfigService _config;
 
-    public ResetModel(AccountMailService accounts, SessionService sessions, TokenRevoker revoker, ActivityService activity)
+    public ResetModel(AccountMailService accounts, SessionService sessions, TokenRevoker revoker, ActivityService activity, MatIdentity.Core.Configuration.SystemConfigService config)
     {
+        _config = config;
         _accounts = accounts;
         _sessions = sessions;
         _revoker = revoker;
@@ -43,6 +45,8 @@ public class ResetModel : PageModel
 
     public bool IsInvitation => Link?.Purpose == AccountTokenPurpose.Invitation;
 
+    public int MinPasswordLength { get; private set; } = PasswordPolicy.Floor;
+
     public class InputModel
     {
         [Required(ErrorMessage = "Please enter a password.")]
@@ -57,6 +61,7 @@ public class ResetModel : PageModel
     {
         Response.Headers["Referrer-Policy"] = "no-referrer";
         Link = await _accounts.FindPasswordLinkAsync(Token, HttpContext.RequestAborted);
+        MinPasswordLength = (await _config.GetAsync(HttpContext.RequestAborted)).PasswordMinLength;
         return Page();
     }
 
@@ -64,8 +69,15 @@ public class ResetModel : PageModel
     {
         Response.Headers["Referrer-Policy"] = "no-referrer";
         Link = await _accounts.FindPasswordLinkAsync(Token, HttpContext.RequestAborted);
+        MinPasswordLength = (await _config.GetAsync(HttpContext.RequestAborted)).PasswordMinLength;
         if (Link is null || !ModelState.IsValid)
         {
+            return Page();
+        }
+
+        if (PasswordPolicy.Check(Input.Password, MinPasswordLength, Link.User?.Username, Link.User?.Email) is { } weak)
+        {
+            ModelState.AddModelError("Input.Password", weak);
             return Page();
         }
 

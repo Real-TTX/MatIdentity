@@ -54,8 +54,8 @@ else if (Model.ActiveTab == "password")
                 <mat-field label="Current password" asp-for="Input.CurrentPassword" required="true">
                     <input asp-for="Input.CurrentPassword" type="password" class="mat-input" autocomplete="current-password" required data-msg-required="Please enter your current password." />
                 </mat-field>
-                <mat-field label="New password" asp-for="Input.NewPassword" required="true" hint="At least 8 characters.">
-                    <input asp-for="Input.NewPassword" type="password" class="mat-input" autocomplete="new-password" required minlength="8" data-msg-required="Please enter a new password." data-msg-range="Use at least 8 characters." />
+                <mat-field label="New password" asp-for="Input.NewPassword" required="true" hint="At least @Model.MinPasswordLength characters, not your user name.">
+                    <input asp-for="Input.NewPassword" type="password" class="mat-input" autocomplete="new-password" required minlength="@Model.MinPasswordLength" data-msg-required="Please enter a new password." data-msg-range="Use at least @Model.MinPasswordLength characters." />
                 </mat-field>
                 <mat-field label="Confirm new password" asp-for="Input.ConfirmPassword" required="true">
                     <input asp-for="Input.ConfirmPassword" type="password" class="mat-input" autocomplete="new-password" required data-msg-required="Please repeat the new password." />

@@ -67,6 +67,8 @@ public class EditModel : PageModel
     /// <summary>Too many wrong attempts: until then the password does not sign the person in.</summary>
     public DateTime? LockedUntil { get; private set; }
 
+    public int MinPasswordLength { get; private set; } = PasswordPolicy.Floor;
+
     [TempData] public string? StatusMessage { get; set; }
     [TempData] public bool IsError { get; set; }
 
@@ -141,6 +143,7 @@ public class EditModel : PageModel
 
         MailAvailable = await _mail.IsAvailableAsync(HttpContext.RequestAborted);
         Input.Invite = MailAvailable;
+        MinPasswordLength = (await _config.GetAsync(HttpContext.RequestAborted)).PasswordMinLength;
         return Page();
     }
 
@@ -233,6 +236,7 @@ public class EditModel : PageModel
         var ct = HttpContext.RequestAborted;
         AllGroups = (await _groups.GetAllAsync(ct)).Select(g => g.Group).ToList();
         MailAvailable = await _mail.IsAvailableAsync(ct);
+        MinPasswordLength = (await _config.GetAsync(ct)).PasswordMinLength;
         var invite = !IsEdit && MailAvailable && Input.Invite;
         if (invite && string.IsNullOrWhiteSpace(Input.Email))
         {
@@ -252,6 +256,12 @@ public class EditModel : PageModel
         if (!string.IsNullOrWhiteSpace(Input.Email) && await _userService.EmailExistsAsync(Input.Email, Input.Id, ct))
         {
             ModelState.AddModelError("Input.Email", "Another person has this e-mail address.");
+        }
+
+        if (!string.IsNullOrEmpty(Input.Password)
+            && PasswordPolicy.Check(Input.Password, (await _config.GetAsync(ct)).PasswordMinLength, Input.Username, Input.Email) is { } weak)
+        {
+            ModelState.AddModelError("Input.Password", weak);
         }
 
         var existing = IsEdit ? await _userService.GetAsync(Input.Id!.Value, ct) : null;

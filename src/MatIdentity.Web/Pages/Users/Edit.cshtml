@@ -5,7 +5,7 @@
     ViewData["PageSub"] = Model.IsEdit ? "Change the name, the e-mail, the role or the password." : "Creates an account that signs in to all apps.";
     ViewData["Crumbs"] = Crumbs.Of(("People", "/Users"), (Model.IsEdit ? Model.Input.Username : "New person", null));
     ViewData["Width"] = "narrow";
-    var pwHint = Model.IsEdit ? "Leave blank to keep the current password. A new one signs the person out everywhere." : "At least 8 characters.";
+    var pwHint = Model.IsEdit ? "Leave blank to keep the current password. A new one signs the person out everywhere." : $"At least {Model.MinPasswordLength} characters, not the user name.";
 }
 
 @if (Model.LockedUntil is { } locked)

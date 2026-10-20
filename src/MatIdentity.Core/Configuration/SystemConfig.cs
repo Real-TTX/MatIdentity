@@ -20,6 +20,9 @@ public sealed class SystemConfig
     /// <summary>How long an access token is valid, in minutes. Short, because an app renews it with the refresh token.</summary>
     public int AccessTokenMinutes { get; set; } = 30;
 
+    /// <summary>The shortest password a person may choose (8 to 128).</summary>
+    public int PasswordMinLength { get; set; } = 8;
+
     /// <summary>The own SMTP server (used when MatSMTP is not set); empty: no mail, unless MatSMTP is there.</summary>
     public string? SmtpHost { get; set; }
 

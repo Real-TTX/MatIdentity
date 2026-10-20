@@ -29,7 +29,7 @@
         <mat-field label="E-mail" asp-for="Input.Email" hint="Optional. An app links an existing account by it.">
             <input asp-for="Input.Email" type="email" class="mat-input" autocomplete="email" data-msg-type="Please enter a valid e-mail address." />
         </mat-field>
-        <mat-field label="Password" asp-for="Input.Password" required="true" hint="At least 8 characters.">
+        <mat-field label="Password" asp-for="Input.Password" required="true" hint="At least 8 characters, not the user name.">
             <input asp-for="Input.Password" type="password" class="mat-input" autocomplete="new-password" required minlength="8" data-msg-required="Please choose a password." data-msg-range="Use at least 8 characters." />
         </mat-field>
         <mat-field label="Confirm password" asp-for="Input.ConfirmPassword" required="true">

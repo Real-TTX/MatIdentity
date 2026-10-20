@@ -56,6 +56,8 @@ public class ProfileModel : PageModel
     public bool CanVerify { get; private set; }
     public UserRole Role { get; private set; }
     public bool MustChange { get; private set; }
+
+    public int MinPasswordLength { get; private set; } = MatIdentity.Core.Users.PasswordPolicy.Floor;
     public IReadOnlyList<UserSession> Sessions { get; private set; } = [];
     public string? CurrentToken => User.GetSessionToken();
 
@@ -122,6 +124,12 @@ public class ProfileModel : PageModel
             return Page();
         }
 
+        if (MatIdentity.Core.Users.PasswordPolicy.Check(Input.NewPassword, MinPasswordLength, user.Username, user.Email) is { } weak)
+        {
+            ModelState.AddModelError("Input.NewPassword", weak);
+            return Page();
+        }
+
         await _userService.ChangePasswordAsync(userId, Input.NewPassword, HttpContext.RequestAborted);
         // A new password ends the sign-in everywhere else (a stolen session or device is out).
         await _sessions.InvalidateAllAsync(userId, exceptToken: CurrentToken, HttpContext.RequestAborted);
@@ -184,6 +192,7 @@ public class ProfileModel : PageModel
         CanVerify = !string.IsNullOrEmpty(user.Email) && !user.EmailVerified && await _mail.IsAvailableAsync(HttpContext.RequestAborted);
         Role = user.Role;
         MustChange = user.MustChangePassword;
+        MinPasswordLength = (await _config.GetAsync(HttpContext.RequestAborted)).PasswordMinLength;
         Sessions = await _sessions.ListActiveAsync(user.Id, HttpContext.RequestAborted);
         return true;
     }

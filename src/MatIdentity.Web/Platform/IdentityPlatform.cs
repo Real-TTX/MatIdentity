@@ -59,7 +59,7 @@ public sealed class IdentityPlatform : IMatPlatformApp
             new MatPage("settings", "Settings", "settings",
             [
                 new MatSection("form", ["instanceName", "issuer"], Label: "General"),
-                new MatSection("form", ["sessionLifetimeDays", "accessTokenMinutes"], Label: "Sign-in"),
+                new MatSection("form", ["sessionLifetimeDays", "accessTokenMinutes", "passwordMinLength"], Label: "Sign-in"),
                 new MatSection("form", MailKeys, Label: "Mail"),
             ]),
         ],
@@ -90,6 +90,11 @@ public sealed class IdentityPlatform : IMatPlatformApp
             {
                 Required = true, Min = SystemConfigService.MinTokenMinutes, Max = SystemConfigService.MaxTokenMinutes,
                 Hint = "Short is safer; the apps renew it on their own.", Restart = true,
+            },
+            new MatField("passwordMinLength", "Shortest password", "number")
+            {
+                Required = true, Min = MatIdentity.Core.Users.PasswordPolicy.Floor, Max = MatIdentity.Core.Users.PasswordPolicy.Ceiling,
+                Hint = "For new passwords.",
             },
             .. MailFields(),
         ],
@@ -163,6 +168,7 @@ public sealed class IdentityPlatform : IMatPlatformApp
             ["issuer"] = config.Issuer,
             ["sessionLifetimeDays"] = config.SessionLifetimeDays,
             ["accessTokenMinutes"] = config.AccessTokenMinutes,
+            ["passwordMinLength"] = config.PasswordMinLength,
             ["smtpHost"] = _mail.Relay.Target?.Host ?? config.SmtpHost,
             ["smtpPort"] = _mail.Relay.Target?.Port ?? config.SmtpPort,
             ["smtpTls"] = _mail.Relay.Target is { } relay ? SmtpTarget.Name(relay.Tls) : config.SmtpTls,
@@ -225,10 +231,13 @@ public sealed class IdentityPlatform : IMatPlatformApp
                 case "accessTokenMinutes" when value.TryGetInt32Strict(out var minutes):
                     config.AccessTokenMinutes = minutes;
                     break;
+                case "passwordMinLength" when value.TryGetInt32Strict(out var length):
+                    config.PasswordMinLength = length;
+                    break;
                 case "instanceName" or "issuer":
                     errors[key] = "Enter a text.";
                     break;
-                case "sessionLifetimeDays" or "accessTokenMinutes":
+                case "sessionLifetimeDays" or "accessTokenMinutes" or "passwordMinLength":
                     errors[key] = "Enter a whole number.";
                     break;
                 default:

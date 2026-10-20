@@ -41,6 +41,11 @@ public sealed class SystemConfigService
             errors["accessTokenMinutes"] = $"Choose between {MinTokenMinutes} and {MaxTokenMinutes} minutes.";
         }
 
+        if (config.PasswordMinLength is < Users.PasswordPolicy.Floor or > Users.PasswordPolicy.Ceiling)
+        {
+            errors["passwordMinLength"] = $"Choose between {Users.PasswordPolicy.Floor} and {Users.PasswordPolicy.Ceiling} characters.";
+        }
+
         if (!string.IsNullOrWhiteSpace(config.SmtpHost))
         {
             if (config.SmtpHost.Trim().Length > 253 || config.SmtpHost.Any(char.IsWhiteSpace))

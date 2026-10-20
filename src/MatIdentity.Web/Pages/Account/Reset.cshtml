@@ -25,8 +25,8 @@
         <form method="post" class="mat-form" novalidate>
             <input type="hidden" asp-for="Token" />
             <partial name="_ValidationSummary" />
-            <mat-field label="Password" asp-for="Input.Password" required="true" hint="At least 8 characters.">
-                <input asp-for="Input.Password" type="password" class="mat-input" autocomplete="new-password" autofocus required minlength="8" data-msg-required="Please enter a password." data-msg-range="Use at least 8 characters." />
+            <mat-field label="Password" asp-for="Input.Password" required="true" hint="At least @Model.MinPasswordLength characters, not your user name.">
+                <input asp-for="Input.Password" type="password" class="mat-input" autocomplete="new-password" autofocus required minlength="@Model.MinPasswordLength" data-msg-required="Please enter a password." data-msg-range="Use at least @Model.MinPasswordLength characters." />
             </mat-field>
             <mat-field label="Confirm password" asp-for="Input.ConfirmPassword" required="true">
                 <input asp-for="Input.ConfirmPassword" type="password" class="mat-input" autocomplete="new-password" required data-msg-required="Please repeat the password." />

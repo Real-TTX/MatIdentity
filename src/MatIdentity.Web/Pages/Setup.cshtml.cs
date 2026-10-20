@@ -68,6 +68,11 @@ public class SetupModel : PageModel
             return RedirectToPage("/Index");
         }
 
+        if (MatIdentity.Core.Users.PasswordPolicy.Check(Input.Password, MatIdentity.Core.Users.PasswordPolicy.Floor, Input.Username, Input.Email) is { } weak)
+        {
+            ModelState.AddModelError("Input.Password", weak);
+        }
+
         if (!ModelState.IsValid)
         {
             return Page();

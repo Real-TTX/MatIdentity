@@ -31,6 +31,9 @@
             <mat-field label="Access token (minutes)" asp-for="Input.AccessTokenMinutes" required="true" hint="Short is safer; the apps renew it on their own. Takes effect after a restart.">
                 <input asp-for="Input.AccessTokenMinutes" type="number" class="mat-input" min="5" max="1440" required data-msg-range="Choose between 5 and 1440 minutes." />
             </mat-field>
+            <mat-field label="Shortest password" asp-for="Input.PasswordMinLength" required="true" hint="For new passwords. Never the user name, never one of the passwords tried first.">
+                <input asp-for="Input.PasswordMinLength" type="number" class="mat-input" min="8" max="128" required data-msg-range="Choose between 8 and 128 characters." />
+            </mat-field>
         </div>
     </div>
 
