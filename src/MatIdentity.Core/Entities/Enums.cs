@@ -49,5 +49,25 @@ public enum ActivityKind
     InvitationSent = 12,
 
     /// <summary>A person confirmed their e-mail address.</summary>
-    EmailVerified = 13
+    EmailVerified = 13,
+
+    PersonCreated = 14,
+    PersonChanged = 15,
+    PersonDeleted = 16,
+
+    /// <summary>An administrator turned off the authenticator app and removed the passkeys of a person (a lost device).</summary>
+    SecondStepReset = 17,
+
+    GroupSaved = 18,
+    GroupDeleted = 19,
+    SettingsChanged = 20,
+
+    /// <summary>"Sign everyone out": every session and every refresh token ended.</summary>
+    EveryoneSignedOut = 21,
+
+    /// <summary>Too many wrong passwords or codes in a row: the password does not sign the account in for a while.</summary>
+    AccountLocked = 22,
+
+    /// <summary>The configuration was downloaded (apps, groups, access, settings; never a secret).</summary>
+    ConfigurationExported = 23
 }

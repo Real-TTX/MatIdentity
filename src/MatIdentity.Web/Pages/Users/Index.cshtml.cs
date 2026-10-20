@@ -23,9 +23,11 @@ public class IndexModel : PageModel
     private readonly PasskeyService _passkeys;
 
     private readonly AccountMailService _accounts;
+    private readonly MatIdentity.Core.Activity.ActivityService _activity;
 
-    public IndexModel(UserService userService, SessionService sessions, TokenRevoker revoker, PermissionService permissions, PasskeyService passkeys, AccountMailService accounts)
+    public IndexModel(UserService userService, SessionService sessions, TokenRevoker revoker, PermissionService permissions, PasskeyService passkeys, AccountMailService accounts, MatIdentity.Core.Activity.ActivityService activity)
     {
+        _activity = activity;
         _accounts = accounts;
         _passkeys = passkeys;
         _permissions = permissions;
@@ -118,7 +120,13 @@ public class IndexModel : PageModel
             await _permissions.RemoveUserAsync(user.Id, HttpContext.RequestAborted);
         }
 
+        var name = (await _userService.GetAsync(id, HttpContext.RequestAborted))?.Username;
         var deleted = await _userService.DeleteAsync(id, HttpContext.RequestAborted);
+        if (deleted)
+        {
+            await _activity.WriteAsync(ActivityKind.PersonDeleted, username: User.GetUsername(), ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString(), detail: name, ct: HttpContext.RequestAborted);
+        }
+
         StatusMessage = deleted ? "Person deleted." : "Person not found.";
         IsError = !deleted;
         return RedirectToPage();

@@ -12,10 +12,12 @@ public class IndexModel : PageModel
     private const int PageSize = 15;
 
     private readonly GroupService _groups;
+    private readonly MatIdentity.Core.Activity.ActivityService _activity;
 
-    public IndexModel(GroupService groups)
+    public IndexModel(GroupService groups, MatIdentity.Core.Activity.ActivityService activity)
     {
         _groups = groups;
+        _activity = activity;
     }
 
     public ListView<(Group Group, int Members)> List { get; private set; } = default!;
@@ -64,7 +66,13 @@ public class IndexModel : PageModel
 
     public async Task<IActionResult> OnPostDeleteAsync(long id)
     {
+        var name = (await _groups.GetAsync(id, HttpContext.RequestAborted))?.Name;
         var deleted = await _groups.DeleteAsync(id, HttpContext.RequestAborted);
+        if (deleted)
+        {
+            await _activity.WriteAsync(ActivityKind.GroupDeleted, username: User.GetUsername(), ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString(), detail: name, ct: HttpContext.RequestAborted);
+        }
+
         StatusMessage = deleted ? "Group deleted. Its people keep what was given to them directly." : "Group not found.";
         IsError = !deleted;
         return RedirectToPage();

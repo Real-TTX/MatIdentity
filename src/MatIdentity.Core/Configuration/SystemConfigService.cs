@@ -67,6 +67,18 @@ public sealed class SystemConfigService
         return errors;
     }
 
+    /// <summary>The names of the settings that differ (for the activity list; values are not named, the SMTP password is only 'smtpPassword').</summary>
+    public static List<string> Changes(SystemConfig before, SystemConfig after)
+    {
+        var a = System.Text.Json.JsonSerializer.SerializeToElement(before, JsonConfigStore.JsonOptions);
+        var b = System.Text.Json.JsonSerializer.SerializeToElement(after, JsonConfigStore.JsonOptions);
+        var names = a.EnumerateObject().Select(p => p.Name).Union(b.EnumerateObject().Select(p => p.Name));
+        return names
+            .Where(n => (a.TryGetProperty(n, out var x) ? x.GetRawText() : null) != (b.TryGetProperty(n, out var y) ? y.GetRawText() : null))
+            .Select(n => n == "smtpPasswordProtected" ? "smtpPassword" : n)
+            .ToList();
+    }
+
     /// <summary>A plain address (<c>name@host</c>), as MimeKit reads it.</summary>
     public static bool IsMailAddress(string value)
         => MimeKit.MailboxAddress.TryParse(value.Trim(), out var address) && address.Address.Contains('@') && string.IsNullOrEmpty(address.Name);

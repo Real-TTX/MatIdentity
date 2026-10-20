@@ -121,6 +121,7 @@ public class IndexModel : PageModel
             return Page();
         }
 
+        var before = await _config.GetAsync(HttpContext.RequestAborted);
         var config = await _config.GetAsync(HttpContext.RequestAborted);
         var restart = !string.Equals(config.Issuer ?? string.Empty, Input.Issuer?.Trim().TrimEnd('/') ?? string.Empty, StringComparison.Ordinal)
                       || config.AccessTokenMinutes != Input.AccessTokenMinutes;
@@ -157,6 +158,12 @@ public class IndexModel : PageModel
             return Page();
         }
 
+        if (SystemConfigService.Changes(before, config) is { Count: > 0 } changed)
+        {
+            await _activity.WriteAsync(ActivityKind.SettingsChanged, username: User.GetUsername(), ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString(),
+                detail: string.Join(", ", changed), ct: HttpContext.RequestAborted);
+        }
+
         StatusMessage = restart ? "Settings saved. Restart MatIdentity for the address and the token lifetime to take effect." : "Settings saved.";
         return RedirectToPage();
     }
@@ -182,8 +189,8 @@ public class IndexModel : PageModel
     public async Task<IActionResult> OnPostSignOutEveryoneAsync()
     {
         var (sessions, tokens) = await IdentityPlatform.SignOutEveryoneAsync(_sessions, _revoker, HttpContext.RequestAborted);
-        await _activity.WriteAsync(ActivityKind.SignOut, username: User.GetUsername(), ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString(),
-            detail: $"Everyone signed out ({sessions} sessions, {tokens} app sign-ins)", ct: HttpContext.RequestAborted);
+        await _activity.WriteAsync(ActivityKind.EveryoneSignedOut, username: User.GetUsername(), ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString(),
+            detail: $"({sessions} sessions, {tokens} app sign-ins)", ct: HttpContext.RequestAborted);
         // That includes this browser: the next page asks for the sign-in.
         return RedirectToPage("/Account/Login", new { signedOut = true });
     }

@@ -242,7 +242,14 @@ public sealed class IdentityPlatform : IMatPlatformApp
             return errors;
         }
 
-        return await _config.SaveAsync(config, ct);
+        var before = await _config.GetAsync(ct);
+        var saveErrors = await _config.SaveAsync(config, ct);
+        if (saveErrors.Count == 0 && SystemConfigService.Changes(before, config) is { Count: > 0 } changed)
+        {
+            await _activity.WriteAsync(ActivityKind.SettingsChanged, username: caller, detail: "Through the API: " + string.Join(", ", changed), ct: ct);
+        }
+
+        return saveErrors;
     }
 
     public async Task<(bool Ok, string Message)?> RunActionAsync(string id, string caller, CancellationToken ct)
@@ -251,7 +258,7 @@ public sealed class IdentityPlatform : IMatPlatformApp
         {
             case "signOutEveryone":
                 var (sessions, tokens) = await SignOutEveryoneAsync(_sessions, _revoker, ct);
-                await _activity.WriteAsync(ActivityKind.SignOut, username: caller, detail: $"Everyone signed out ({sessions} sessions, {tokens} app sign-ins)", ct: ct);
+                await _activity.WriteAsync(ActivityKind.EveryoneSignedOut, username: caller, detail: $"({sessions} sessions, {tokens} app sign-ins)", ct: ct);
                 return (true, $"{sessions} sessions and {tokens} app sign-ins ended.");
             default:
                 return null;

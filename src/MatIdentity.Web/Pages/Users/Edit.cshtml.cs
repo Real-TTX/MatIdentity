@@ -201,8 +201,8 @@ public class EditModel : PageModel
 
         await _twoFactor.DisableAsync(user.Id, ct);
         var removed = await _passkeys.DeleteAllAsync(user.Id, ct);
-        await _activity.WriteAsync(ActivityKind.SignOut, username: User.GetUsername(), ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString(),
-            detail: $"Second step of {user.Username} reset (authenticator app off, {removed} passkeys removed)", ct: ct);
+        await _activity.WriteAsync(ActivityKind.SecondStepReset, username: User.GetUsername(), ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString(),
+            detail: $"{user.Username} (authenticator app off, {removed} passkeys removed)", ct: ct);
         StatusMessage = $"The second step of {user.DisplayName} is reset: the password alone signs them in until they set up a new one.";
         IsError = false;
         return RedirectToPage(new { id });
@@ -261,8 +261,31 @@ public class EditModel : PageModel
         var displayName = Input.DisplayName ?? string.Empty;
         if (existing is not null)
         {
+            var changes = new List<string>();
+            if (existing.Role != Input.Role)
+            {
+                changes.Add("role " + Input.Role);
+            }
+
+            if (existing.IsActive != Input.IsActive)
+            {
+                changes.Add(Input.IsActive ? "enabled" : "disabled");
+            }
+
+            if (!string.Equals(existing.Email ?? string.Empty, Input.Email?.Trim() ?? string.Empty, StringComparison.OrdinalIgnoreCase))
+            {
+                changes.Add("e-mail");
+            }
+
+            if (!string.IsNullOrEmpty(Input.Password))
+            {
+                changes.Add("new password");
+            }
+
             await _userService.UpdateAsync(existing.Id, displayName, Input.Email, Input.Role, Input.IsActive, Input.Password, ct);
             await _groups.SetGroupsOfAsync(existing.Id, Input.GroupIds, ct);
+            await _activity.WriteAsync(ActivityKind.PersonChanged, username: User.GetUsername(), ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString(),
+                detail: existing.Username + (changes.Count > 0 ? ": " + string.Join(", ", changes) : string.Empty), ct: ct);
 
             // A disabled account or a password set by an administrator: out everywhere.
             if (!Input.IsActive || !string.IsNullOrEmpty(Input.Password))
@@ -285,6 +308,8 @@ public class EditModel : PageModel
             var password = invite ? AccountMailService.UnusablePassword() : Input.Password!;
             var created = await _userService.CreateAsync(Input.Username, displayName, Input.Email, password, Input.Role, mustChangePassword: false, ct);
             await _groups.SetGroupsOfAsync(created.Id, Input.GroupIds, ct);
+            await _activity.WriteAsync(ActivityKind.PersonCreated, username: User.GetUsername(), ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString(),
+                detail: created.Username + (created.Role == UserRole.Admin ? " (administrator)" : string.Empty), ct: ct);
             if (invite && !await InviteAsync(created))
             {
                 // Created, but the mail failed: the person's page says so and offers to send it again.

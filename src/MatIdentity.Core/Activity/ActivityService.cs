@@ -66,6 +66,16 @@ public sealed class ActivityService
         ActivityKind.PasswordSetByLink => "Password set by link",
         ActivityKind.InvitationSent => "Invitation sent",
         ActivityKind.EmailVerified => "E-mail confirmed",
+        ActivityKind.PersonCreated => "Person added",
+        ActivityKind.PersonChanged => "Person changed",
+        ActivityKind.PersonDeleted => "Person deleted",
+        ActivityKind.SecondStepReset => "Second step reset",
+        ActivityKind.GroupSaved => "Group saved",
+        ActivityKind.GroupDeleted => "Group deleted",
+        ActivityKind.SettingsChanged => "Settings changed",
+        ActivityKind.EveryoneSignedOut => "Everyone signed out",
+        ActivityKind.AccountLocked => "Account locked",
+        ActivityKind.ConfigurationExported => "Configuration exported",
         _ => kind.ToString(),
     };
 

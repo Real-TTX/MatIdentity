@@ -5,10 +5,10 @@
 @{
     var tone = Model switch
     {
-        ActivityKind.SignInFailed => "mat-pill--error",
+        ActivityKind.SignInFailed or ActivityKind.AccountLocked => "mat-pill--error",
         ActivityKind.SignIn or ActivityKind.AppSignIn or ActivityKind.EmailVerified or ActivityKind.PasswordSetByLink => "mat-pill--ok",
-        ActivityKind.ClientDeleted or ActivityKind.ClientSecretRenewed => "mat-pill--warn",
-        ActivityKind.ClientCreated or ActivityKind.ClientChanged or ActivityKind.MachineToken or ActivityKind.InvitationSent or ActivityKind.PasswordResetSent => "mat-pill--info",
+        ActivityKind.ClientDeleted or ActivityKind.ClientSecretRenewed or ActivityKind.PersonDeleted or ActivityKind.GroupDeleted or ActivityKind.SecondStepReset or ActivityKind.EveryoneSignedOut => "mat-pill--warn",
+        ActivityKind.ClientCreated or ActivityKind.ClientChanged or ActivityKind.MachineToken or ActivityKind.InvitationSent or ActivityKind.PasswordResetSent or ActivityKind.PersonCreated or ActivityKind.PersonChanged or ActivityKind.GroupSaved or ActivityKind.SettingsChanged or ActivityKind.ConfigurationExported => "mat-pill--info",
         _ => string.Empty,
     };
 }

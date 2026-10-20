@@ -12,9 +12,11 @@ public class EditModel : PageModel
 {
     private readonly GroupService _groups;
     private readonly UserService _users;
+    private readonly MatIdentity.Core.Activity.ActivityService _activity;
 
-    public EditModel(GroupService groups, UserService users)
+    public EditModel(GroupService groups, UserService users, MatIdentity.Core.Activity.ActivityService activity)
     {
+        _activity = activity;
         _groups = groups;
         _users = users;
     }
@@ -85,7 +87,10 @@ public class EditModel : PageModel
         }
 
         var known = People.Select(p => p.Id).ToHashSet();
-        await _groups.SaveAsync(Input.Id, Input.Name, Input.Description, Input.MemberIds.Where(known.Contains), ct);
+        var members = Input.MemberIds.Where(known.Contains).ToList();
+        await _groups.SaveAsync(Input.Id, Input.Name, Input.Description, members, ct);
+        await _activity.WriteAsync(ActivityKind.GroupSaved, username: User.GetUsername(), ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString(),
+            detail: $"{Input.Name.Trim()} ({members.Count} {(members.Count == 1 ? "person" : "people")})", ct: ct);
         StatusMessage = IsEdit ? "Group saved." : "Group created.";
         return RedirectToPage("/Groups/Index");
     }
