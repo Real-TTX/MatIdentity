@@ -17,6 +17,7 @@ namespace MatIdentity.Tests;
 public sealed class OidcFlowTests
 {
     private const string Redirect = "https://split.test/signin-oidc";
+    private const string SignedOut = "https://split.test/signout-callback-oidc";
     private readonly IdentityFactory _site;
 
     public OidcFlowTests(IdentityFactory site)
@@ -112,7 +113,7 @@ public sealed class OidcFlowTests
     [Fact]
     public async Task A_machine_token_opens_the_platform_api_and_a_token_for_another_app_does_not()
     {
-        var secret = await RegisterAsync("mattiverse-test", allowSignIn: false, allowMachine: true);
+        var secret = await RegisterAsync("mattiverse-test", allowSignIn: false, allowMachine: true, callTargets: ["matidentity"]);
 
         var token = await PostTokenAsync(new Dictionary<string, string>
         {
@@ -162,10 +163,89 @@ public sealed class OidcFlowTests
         Assert.Contains("invalid_client", await response.Content.ReadAsStringAsync());
     }
 
-    /// <summary>Registers an app through the client API (as Mattiverse does) and returns its secret.</summary>
-    private async Task<string> RegisterAsync(string id, bool allowSignIn, bool allowMachine)
+    [Fact]
+    public async Task Calling_every_app_does_not_include_the_api_of_MatIdentity()
     {
-        var body = new { displayName = id, allowSignIn, allowMachine, callsAllApps = allowMachine, redirectUris = allowSignIn ? new[] { Redirect } : Array.Empty<string>(), managedBy = "tests" };
+        var secret = await RegisterAsync("matcalls-all", allowSignIn: false, allowMachine: true);
+        var response = await _site.CreateClient().PostAsync("/connect/token", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["grant_type"] = "client_credentials",
+            ["client_id"] = "matcalls-all",
+            ["client_secret"] = secret,
+            ["scope"] = "app:matidentity",
+        }));
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.DoesNotContain("access_token", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task A_refresh_token_used_twice_ends_the_whole_chain()
+    {
+        var secret = await RegisterAsync("matsplit-reuse", allowSignIn: true, allowMachine: false);
+        var (tokens, _) = await SignInToAppAsync("matsplit-reuse", secret);
+        var first = tokens.GetProperty("refresh_token").GetString()!;
+
+        var second = (await PostTokenAsync(Refresh("matsplit-reuse", secret, first))).GetProperty("refresh_token").GetString()!;
+        Assert.NotEqual(first, second);
+
+        // The old one again (stolen and replayed): refused, and the new one stops working too.
+        var replay = await _site.CreateClient().PostAsync("/connect/token", new FormUrlEncodedContent(Refresh("matsplit-reuse", secret, first)));
+        Assert.Equal(HttpStatusCode.BadRequest, replay.StatusCode);
+        var afterReplay = await _site.CreateClient().PostAsync("/connect/token", new FormUrlEncodedContent(Refresh("matsplit-reuse", secret, second)));
+        Assert.Equal(HttpStatusCode.BadRequest, afterReplay.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_sign_out_link_without_the_id_token_asks_first_and_one_with_it_signs_out()
+    {
+        var secret = await RegisterAsync("matsplit-logout", allowSignIn: true, allowMachine: false);
+        var (tokens, browser) = await SignInToAppAsync("matsplit-logout", secret);
+        var logout = "/connect/logout?post_logout_redirect_uri=" + Uri.EscapeDataString(SignedOut) + "&state=bye";
+
+        // A link from anywhere: the person confirms first and is still signed in.
+        var link = await browser.GetAsync(logout);
+        Assert.Equal(HttpStatusCode.Redirect, link.StatusCode);
+        Assert.StartsWith("/Account/Logout?returnUrl=", link.Headers.Location!.OriginalString);
+        Assert.Equal(HttpStatusCode.OK, (await browser.GetAsync("/Account/Profile")).StatusCode);
+
+        // The app with the person's ID token: out at once, back to the app.
+        var hinted = await browser.GetAsync(logout + "&id_token_hint=" + tokens.GetProperty("id_token").GetString());
+        Assert.Equal(HttpStatusCode.Redirect, hinted.StatusCode);
+        Assert.StartsWith(SignedOut, hinted.Headers.Location!.OriginalString);
+        Assert.Equal(HttpStatusCode.Redirect, (await browser.GetAsync("/Account/Profile")).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_person_signs_in_with_the_e_mail_address_in_any_case()
+    {
+        var browser = _site.Browser();
+        Assert.Equal("/", await IdentityFactory.SignInAsync(browser, "/Account/Login", "ADMIN@Example.com"));
+    }
+
+    /// <summary>The development account signs in to an app with the form; the tokens and the browser (with the session).</summary>
+    private async Task<(JsonElement Tokens, HttpClient Browser)> SignInToAppAsync(string clientId, string secret)
+    {
+        var browser = _site.Browser();
+        var (verifier, challenge) = Pkce();
+        var authorize = $"/connect/authorize?client_id={clientId}&response_type=code&scope={Uri.EscapeDataString("openid profile email roles offline_access")}" +
+                        $"&redirect_uri={Uri.EscapeDataString(Redirect)}&code_challenge={challenge}&code_challenge_method=S256&state=xyz";
+        var login = (await browser.GetAsync(authorize)).Headers.Location!.OriginalString;
+        var code = await CodeAsync(browser, await IdentityFactory.SignInAsync(browser, login));
+        return (await ExchangeAsync(clientId, secret, code, verifier), browser);
+    }
+
+    private static Dictionary<string, string> Refresh(string clientId, string secret, string refreshToken) => new()
+    {
+        ["grant_type"] = "refresh_token",
+        ["refresh_token"] = refreshToken,
+        ["client_id"] = clientId,
+        ["client_secret"] = secret,
+    };
+
+    /// <summary>Registers an app through the client API (as Mattiverse does) and returns its secret.</summary>
+    private async Task<string> RegisterAsync(string id, bool allowSignIn, bool allowMachine, string[]? callTargets = null)
+    {
+        var body = new { displayName = id, allowSignIn, allowMachine, callsAllApps = allowMachine, callTargets, redirectUris = allowSignIn ? new[] { Redirect } : Array.Empty<string>(), postLogoutRedirectUris = allowSignIn ? new[] { SignedOut } : Array.Empty<string>(), managedBy = "tests" };
         var response = await _site.Api().PutAsJsonAsync($"/api/v1/clients/{id}", body);
         var text = await response.Content.ReadAsStringAsync();
         Assert.True(response.IsSuccessStatusCode, text);

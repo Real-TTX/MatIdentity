@@ -86,6 +86,10 @@ else
                                     }
                                 </div>
                             }
+                            <label class="mat-check">
+                                <input type="checkbox" name="Input.CallTargets" value="@MatIdentity.Core.Clients.ClientRules.SelfId" checked="@Model.Input.CallTargets.Contains(MatIdentity.Core.Clients.ClientRules.SelfId)" />
+                                <span class="mat-check__text">The API of @Ui.App.Name: add and change apps, read the figures <span class="mat-muted mat-mono">app:@MatIdentity.Core.Clients.ClientRules.SelfId</span></span>
+                            </label>
                         </div>
                         @if (!Model.IsEdit)
                         {

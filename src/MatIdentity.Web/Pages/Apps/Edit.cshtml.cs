@@ -135,7 +135,7 @@ public class EditModel : PageModel
         {
             var policy = await _permissions.PolicyAsync(clientId, HttpContext.RequestAborted);
             await _permissions.SavePolicyAsync(clientId, policy.RoleMode, policy.OpenToEveryone, Input.AllowMachine && Input.CallsAllApps, HttpContext.RequestAborted);
-            var known = OtherApps.Select(a => a.ClientId).ToHashSet(StringComparer.Ordinal);
+            var known = OtherApps.Select(a => a.ClientId).Append(ClientRules.SelfId).ToHashSet(StringComparer.Ordinal);
             await _permissions.SetCallTargetsAsync(clientId, Input.AllowMachine ? Input.CallTargets.Where(known.Contains) : [], HttpContext.RequestAborted);
         }
 
@@ -201,7 +201,7 @@ public class EditModel : PageModel
 
     /// <summary>The address an app receives the sign-in at, as most OpenID Connect libraries choose it (ASP.NET Core: /signin-oidc).</summary>
     public static string SuggestedRedirect(string? homeUrl)
-        => string.IsNullOrWhiteSpace(homeUrl) ? "https://app.example.com/signin-oidc" : homeUrl.TrimEnd('/') + "/signin-oidc";
+        => string.IsNullOrWhiteSpace(homeUrl) ? "https://split.example.com/signin-oidc" : homeUrl.TrimEnd('/') + "/signin-oidc";
 
     private async Task LoadOtherAppsAsync()
         => OtherApps = (await _clients.GetAllAsync(HttpContext.RequestAborted)).Where(a => a.ClientId != Id).ToList();

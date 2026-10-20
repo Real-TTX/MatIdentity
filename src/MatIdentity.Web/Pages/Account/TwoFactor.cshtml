@@ -3,13 +3,16 @@
 @{
     Layout = "_Bare";
     ViewData["Title"] = "Second step";
+    var lead = Model.HasAuthenticator
+        ? "Enter the code of your authenticator app" + (Model.HasPasskey ? ", or use your passkey." : ".")
+        : Model.HasRecoveryCodes ? "Use your passkey, or one of your recovery codes." : "Use your passkey.";
 }
 
 <div class="mat-auth__card">
     <div class="mat-auth__brand">
         @Ui.Logo("lg")
         <h1>One more step</h1>
-        <p class="mat-muted">@(Model.HasAuthenticator ? "Enter the code your authenticator app shows" + (Model.HasPasskey ? ", or use your passkey." : ".") : "Use your passkey, or one of your recovery codes.")</p>
+        <p class="mat-muted">@lead</p>
     </div>
 
     @if (!string.IsNullOrEmpty(Model.ErrorMessage))
@@ -25,16 +28,23 @@
         </div>
     }
 
-    <form method="post" class="mat-form" novalidate>
-        <input type="hidden" asp-for="ReturnUrl" />
-        <partial name="_ValidationSummary" />
-        <mat-field label="@(Model.HasAuthenticator ? "Code" : "Recovery code")" asp-for="Code" hint="@(Model.HasAuthenticator ? "Six digits. Lost your phone? A recovery code works here too." : "Like abcde-12345.")">
-            <input asp-for="Code" class="mat-input mat-mono" autocomplete="one-time-code" inputmode="@(Model.HasAuthenticator ? "numeric" : "text")" autofocus required data-msg-required="Please enter the code." />
-        </mat-field>
-        <div class="mat-btn-row mat-btn-row--plain">
-            <button type="submit" class="mat-btn @(Model.HasPasskey ? "mat-btn--secondary" : "mat-btn--primary") mat-btn--block"><icon name="check" /><span>Continue</span></button>
-        </div>
-    </form>
+    @if (Model.AcceptsCode)
+    {
+        <form method="post" class="mat-form" novalidate>
+            <input type="hidden" asp-for="ReturnUrl" />
+            <partial name="_ValidationSummary" />
+            <mat-field label="@(Model.HasAuthenticator ? "Code" : "Recovery code")" asp-for="Code" hint="@(Model.HasAuthenticator ? "Six digits. Lost your phone? A recovery code works here too." : "Like abcde-12345.")">
+                <input asp-for="Code" class="mat-input mat-mono" autocomplete="one-time-code" inputmode="@(Model.HasAuthenticator ? "numeric" : "text")" autofocus required data-msg-required="Please enter the code." />
+            </mat-field>
+            <div class="mat-btn-row mat-btn-row--plain">
+                <button type="submit" class="mat-btn @(Model.HasPasskey ? "mat-btn--secondary" : "mat-btn--primary") mat-btn--block"><icon name="check" /><span>Continue</span></button>
+            </div>
+        </form>
+    }
+    else
+    {
+        <p class="mat-hint">No passkey at hand? An administrator can reset your second step.</p>
+    }
 
-    <a class="mat-btn mat-btn--ghost mat-btn--block" href="/Account/Login">Cancel</a>
+    <a class="mat-btn mat-btn--ghost mat-btn--block" href="@Model.CancelUrl">Cancel</a>
 </div>

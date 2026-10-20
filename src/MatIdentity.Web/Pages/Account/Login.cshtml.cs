@@ -56,7 +56,7 @@ public class LoginModel : PageModel
 
     public class InputModel
     {
-        [Required(ErrorMessage = "Please enter your username.")]
+        [Required(ErrorMessage = "Please enter your username or e-mail.")]
         [Display(Name = "Username")]
         public string Username { get; set; } = string.Empty;
 

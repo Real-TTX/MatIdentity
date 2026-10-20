@@ -124,10 +124,11 @@ public sealed class ClientService
             }
         }
 
+        // Every app may give its own tokens back (a public one too: it signs out without a secret); only an app with a secret may look into tokens.
+        descriptor.Permissions.Add(Permissions.Endpoints.Revocation);
         if (!client.IsPublic)
         {
             descriptor.Permissions.Add(Permissions.Endpoints.Introspection);
-            descriptor.Permissions.Add(Permissions.Endpoints.Revocation);
         }
 
         descriptor.Properties.Remove(HomeProperty);
@@ -225,17 +226,17 @@ public sealed class ClientService
         return names;
     }
 
-    /// <summary>The scopes an app may ask for with client credentials: of every app when it calls all, else of the apps given to it (and only those that exist).</summary>
+    /// <summary>
+    /// The scopes an app may ask for with client credentials: of every app when it calls all, else of the apps given to it (and only those that exist).
+    /// MatIdentity's own API (<c>app:matidentity</c>: the apps, their secrets, the settings) is never part of "all": it is given to an app by name only.
+    /// </summary>
     public async Task<List<string>> MachineScopesAsync(string clientId, CancellationToken ct = default)
     {
         var all = await AppScopeNamesAsync(ct);
-        if ((await _permissions.PolicyAsync(clientId, ct)).CallsAllApps)
-        {
-            return all;
-        }
-
+        var self = ClientRules.AppScope(ClientRules.SelfId);
         var wanted = (await _permissions.CallTargetsAsync(clientId, ct)).Select(ClientRules.AppScope).ToHashSet(StringComparer.Ordinal);
-        return all.Where(wanted.Contains).ToList();
+        var callsAll = (await _permissions.PolicyAsync(clientId, ct)).CallsAllApps;
+        return all.Where(s => s == self ? wanted.Contains(s) : callsAll || wanted.Contains(s)).ToList();
     }
 
     /// <summary>Writes the scopes an app may ask for into its permissions again (after its call rules changed). Nothing for an app that calls no app.</summary>
@@ -261,8 +262,8 @@ public sealed class ClientService
         await _applications.UpdateAsync(app, descriptor, ct);
     }
 
-    /// <summary>Brings the scopes of every app that calls all apps up to date (a new app was added).</summary>
-    private async Task SyncAllCallersAsync(CancellationToken ct)
+    /// <summary>Brings the scopes of every app that calls all apps up to date (a new app was added, or at start after a change of the rule).</summary>
+    public async Task SyncAllCallersAsync(CancellationToken ct = default)
     {
         var callers = new List<string>();
         await foreach (var app in _applications.ListAsync(count: null, offset: null, ct))

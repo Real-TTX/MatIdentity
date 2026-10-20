@@ -1,2 +1,19 @@
 @page
 @model MatIdentity.Web.Pages.Account.LogoutModel
+@{
+    Layout = "_Bare";
+    ViewData["Title"] = "Sign out";
+}
+
+<div class="mat-auth__card">
+    <div class="mat-auth__brand">
+        @Ui.Logo("lg")
+        <h1>Sign out?</h1>
+        <p class="mat-muted">You are signed in as @User.GetDisplayName(). Signing out ends your sign-in here; the apps ask for it again.</p>
+    </div>
+    <form method="post" class="mat-btn-row mat-btn-row--plain">
+        <input type="hidden" asp-for="ReturnUrl" />
+        <button type="submit" class="mat-btn mat-btn--primary mat-btn--block"><icon name="logout" /><span>Sign out</span></button>
+    </form>
+    <a class="mat-btn mat-btn--ghost mat-btn--block" href="/">Cancel</a>
+</div>

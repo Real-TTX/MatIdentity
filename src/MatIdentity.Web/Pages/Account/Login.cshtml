@@ -31,8 +31,8 @@
         <input type="hidden" asp-for="ReturnUrl" />
         <partial name="_ValidationSummary" />
 
-        <mat-field label="Username" asp-for="Input.Username">
-            <input asp-for="Input.Username" class="mat-input" autocomplete="username" autofocus required data-msg-required="Please enter your username." />
+        <mat-field label="Username or e-mail" asp-for="Input.Username">
+            <input asp-for="Input.Username" class="mat-input" autocomplete="username" autofocus required data-msg-required="Please enter your username or e-mail." />
         </mat-field>
 
         <mat-field label="Password" asp-for="Input.Password">

@@ -153,8 +153,7 @@ public static class PasskeyEndpoints
 
         var remember = expectedUser == 0 || (await SignInFlow.PendingAsync(http))?.Remember != false;
         await SignInFlow.CompleteAsync(http, user, remember, expectedUser == 0 ? "with a passkey" : "with the password and a passkey");
-        var returnUrl = !string.IsNullOrEmpty(body.ReturnUrl) && body.ReturnUrl.StartsWith('/') && !body.ReturnUrl.StartsWith("//", StringComparison.Ordinal) ? body.ReturnUrl : "/";
-        return Results.Json(new { redirect = returnUrl });
+        return Results.Json(new { redirect = LocalUrl.OrHome(body.ReturnUrl) });
     }
 
     /// <summary>The relying party is the address the browser sees (behind the proxy: its host), so a passkey belongs to the public name of MatIdentity.</summary>

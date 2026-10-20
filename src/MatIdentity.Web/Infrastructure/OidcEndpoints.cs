@@ -174,6 +174,20 @@ public static class OidcEndpoints
         var cookie = await http.AuthenticateAsync(AuthConstants.CookieScheme);
         if (cookie.Succeeded)
         {
+            // Only an app that names the person (id_token_hint, checked by OpenIddict) signs them out at once; any other request is a link that may come
+            // from anywhere, so the person confirms it first and comes back here afterwards.
+            var request = http.GetOpenIddictServerRequest();
+            var hinted = string.IsNullOrEmpty(request?.IdTokenHint)
+                ? null
+                : (await http.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme)).Principal?.GetClaim(Claims.Subject);
+            var current = cookie.Principal.GetUserId() is { } userId ? await users.GetAsync(userId, http.RequestAborted) : null;
+            if (current is not null && hinted != current.Subject)
+            {
+                var parameters = http.Request.HasFormContentType ? http.Request.Form.ToList() : http.Request.Query.ToList();
+                var back = http.Request.PathBase + http.Request.Path + QueryString.Create(parameters);
+                return Results.Redirect("/Account/Logout?returnUrl=" + Uri.EscapeDataString(back));
+            }
+
             if (cookie.Principal.GetSessionToken() is { } token)
             {
                 await sessions.InvalidateAsync(token, http.RequestAborted);

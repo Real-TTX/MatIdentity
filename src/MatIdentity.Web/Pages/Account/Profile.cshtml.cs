@@ -115,7 +115,7 @@ public class ProfileModel : PageModel
 
         // Re-issue the cookie so the "must change password" flag is cleared immediately.
         user.MustChangePassword = false;
-        await HttpContext.SignInAsync(AuthConstants.CookieScheme, PrincipalFactory.Build(user, CurrentToken ?? string.Empty));
+        await SignInFlow.RenewCookieAsync(HttpContext, user);
 
         StatusMessage = "Password changed. You are signed out on your other devices.";
         return !string.IsNullOrEmpty(ReturnUrl) && Url.IsLocalUrl(ReturnUrl) ? LocalRedirect(ReturnUrl) : RedirectToPage();

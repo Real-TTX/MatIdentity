@@ -9,7 +9,10 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace MatIdentity.Web.Pages.Account;
 
-/// <summary>Signs out of MatIdentity (the menu). An app signs out through <c>/connect/logout</c> instead, which also sends the person back to it.</summary>
+/// <summary>
+/// Signs out of MatIdentity: the menu posts here. A GET asks first (a link on another site must not sign anyone out); <c>/connect/logout</c> sends an app's
+/// sign-out here when it came without an ID token of the person, and the <see cref="ReturnUrl"/> takes the person back to it afterwards.
+/// </summary>
 [AllowAnonymous]
 public class LogoutModel : PageModel
 {
@@ -24,7 +27,11 @@ public class LogoutModel : PageModel
         _activity = activity;
     }
 
-    public IActionResult OnGet() => RedirectToPage("/Account/Login");
+    [BindProperty(SupportsGet = true)]
+    public string? ReturnUrl { get; set; }
+
+    public IActionResult OnGet()
+        => User.Identity?.IsAuthenticated == true ? Page() : LocalRedirect(Target(signedOut: false));
 
     public async Task<IActionResult> OnPostAsync()
     {
@@ -40,6 +47,9 @@ public class LogoutModel : PageModel
         }
 
         await HttpContext.SignOutAsync(AuthConstants.CookieScheme);
-        return RedirectToPage("/Account/Login", new { signedOut = true });
+        return LocalRedirect(Target(signedOut: true));
     }
+
+    private string Target(bool signedOut)
+        => Url.IsLocalUrl(ReturnUrl) ? ReturnUrl! : signedOut ? "/Account/Login?signedOut=true" : "/Account/Login";
 }

@@ -35,7 +35,7 @@ public static class ApiEndpoints
                 return Results.NotFound();
             }
 
-            await http.SignInAsync(AuthConstants.CookieScheme, PrincipalFactory.Build(user, http.User.GetSessionToken() ?? string.Empty));
+            await SignInFlow.RenewCookieAsync(http, user);
             return Results.NoContent();
         }).RequireAuthorization().DisableAntiforgery();
     }

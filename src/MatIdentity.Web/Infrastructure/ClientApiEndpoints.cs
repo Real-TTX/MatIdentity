@@ -15,7 +15,8 @@ namespace MatIdentity.Web.Infrastructure;
 /// GET    /api/v1/clients                     the apps (never a secret)
 /// GET    /api/v1/clients/{clientId}
 /// PUT    /api/v1/clients/{clientId}          { displayName, homeUrl, redirectUris, postLogoutRedirectUris, allowSignIn, allowMachine, isPublic, managedBy, renewSecret,
-///                                              roleMode: "matidentity" or "app", roles: [{ key, label }], openToEveryone, callsAllApps }
+///                                              roleMode: "matidentity" or "app", roles: [{ key, label }], openToEveryone, callsAllApps,
+///                                              callTargets: ["matsplit", "matidentity"] (by name; MatIdentity's own API only so) }
 ///                                            200 { client, clientSecret? }: the secret only when it was made now (a new app, or renewSecret: true)
 /// DELETE /api/v1/clients/{clientId}?managedBy=mattiverse   204, 404, or 409 when the app carries another mark
 /// </code>
@@ -65,6 +66,12 @@ public static class ClientApiEndpoints
             if (roles is not null)
             {
                 await permissions.SaveRolesAsync(clientId, roles, ct);
+            }
+
+            // The apps it may call by name (also MatIdentity's own API, which "every app" leaves out).
+            if (body.CallTargets is not null)
+            {
+                await permissions.SetCallTargetsAsync(clientId, body.CallTargets.Where(ClientRules.IsValidClientId).Distinct(StringComparer.Ordinal), ct);
             }
             var input = new ClientInfo
             {
@@ -139,7 +146,8 @@ public static class ClientApiEndpoints
         string? RoleMode,
         IReadOnlyList<RoleBody>? Roles,
         bool? OpenToEveryone,
-        bool? CallsAllApps);
+        bool? CallsAllApps,
+        IReadOnlyList<string>? CallTargets = null);
 
     public sealed record RoleBody(string? Key, string? Label);
 }

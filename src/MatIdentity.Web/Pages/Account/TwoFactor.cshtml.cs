@@ -45,6 +45,15 @@ public class TwoFactorModel : PageModel
 
     public bool HasPasskey { get; private set; }
 
+    /// <summary>Recovery codes are left (they come with the authenticator app); without them a passkey is the only second step.</summary>
+    public bool HasRecoveryCodes { get; private set; }
+
+    /// <summary>The field for a code: for the authenticator app or a recovery code.</summary>
+    public bool AcceptsCode => HasAuthenticator || HasRecoveryCodes;
+
+    /// <summary>Back to the password, for the same app.</summary>
+    public string CancelUrl => "/Account/Login" + (string.IsNullOrEmpty(ReturnUrl) ? string.Empty : "?returnUrl=" + Uri.EscapeDataString(ReturnUrl));
+
     public async Task<IActionResult> OnGetAsync()
         => await LoadAsync() is null ? RedirectToPage("/Account/Login", new { returnUrl = ReturnUrl }) : Page();
 
@@ -88,6 +97,7 @@ public class TwoFactorModel : PageModel
 
         HasAuthenticator = user.TotpEnabled;
         HasPasskey = await _passkeys.AnyAsync(user.Id, HttpContext.RequestAborted);
+        HasRecoveryCodes = TwoFactorService.RecoveryCodesLeft(user) > 0;
         return user;
     }
 }

@@ -31,7 +31,10 @@ public static class DbBootstrapper
 
         await database.MigrateAsync();
 
-        await provider.GetRequiredService<ClientService>().EnsureAppScopeAsync(ClientRules.SelfId, Ui.App.Name);
+        var clients = provider.GetRequiredService<ClientService>();
+        await clients.EnsureAppScopeAsync(ClientRules.SelfId, Ui.App.Name);
+        // The scopes of the apps that call every app follow the current rule (MatIdentity's own API is no longer part of "every app").
+        await clients.SyncAllCallersAsync();
         await provider.GetRequiredService<ActivityService>().PruneAsync(ActivityDays);
 
         var users = provider.GetRequiredService<UserService>();

@@ -42,6 +42,17 @@ public static class SignInFlow
         await services.GetRequiredService<ActivityService>().WriteAsync(ActivityKind.SignIn, user, ipAddress: ip, detail: how, ct: http.RequestAborted);
     }
 
+    /// <summary>
+    /// Writes the cookie again with the current values of <paramref name="user"/> (a new theme, a password changed), for the same session and as persistent as
+    /// it was: "stay signed in" survives it.
+    /// </summary>
+    public static async Task RenewCookieAsync(HttpContext http, User user)
+    {
+        var current = await http.AuthenticateAsync(AuthConstants.CookieScheme);
+        await http.SignInAsync(AuthConstants.CookieScheme, PrincipalFactory.Build(user, http.User.GetSessionToken() ?? string.Empty),
+            new AuthenticationProperties { IsPersistent = current.Properties?.IsPersistent ?? false });
+    }
+
     /// <summary>Remembers that the password of <paramref name="user"/> was right; the second step is next.</summary>
     public static Task BeginSecondStepAsync(HttpContext http, User user, bool remember)
     {

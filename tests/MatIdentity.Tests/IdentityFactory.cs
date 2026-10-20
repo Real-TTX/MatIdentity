@@ -23,6 +23,8 @@ public sealed class IdentityFactory : WebApplicationFactory<Program>
         Environment.SetEnvironmentVariable("MAT_API_KEY", ApiKey);
         // All requests of the tests come from one address: the limit of the sign-in (20 a minute) would stop them.
         Environment.SetEnvironmentVariable("MatIdentity__RateLimits__SignIn", "10000");
+        // A replayed refresh token is caught at once (the default leeway is for apps that renew twice in parallel).
+        Environment.SetEnvironmentVariable("MatIdentity__RefreshTokenReuseLeewaySeconds", "0");
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder) => builder.UseEnvironment("Development");

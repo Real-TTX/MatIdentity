@@ -1,3 +1,4 @@
+using MatIdentity.Core.Entities;
 using MatIdentity.Core.Data;
 using MatIdentity.Core.Security;
 using Microsoft.EntityFrameworkCore;
@@ -26,7 +27,7 @@ public sealed class AuthService
         // Generic message on purpose: never reveal whether the username exists.
         const string invalidCredentials = "Incorrect username or password.";
 
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.Username == username, ct);
+        var user = await FindAsync(username, ct);
 
         // Always verify (against a dummy hash when the user is unknown) to equalize timing.
         var passwordValid = _passwordHasher.Verify(password, user?.PasswordHash ?? DummyHash);
@@ -47,5 +48,27 @@ public sealed class AuthService
         await _db.SaveChangesAsync(ct);
 
         return AuthenticationResult.Success(user);
+    }
+
+    /// <summary>
+    /// The person behind what was typed into the field "Username": the user name as it is written, else the one user name or e-mail address that matches it
+    /// without regard to case (both are unique that way in practice; when two match, neither is guessed).
+    /// </summary>
+    public async Task<User?> FindAsync(string login, CancellationToken ct = default)
+    {
+        var typed = (login ?? string.Empty).Trim();
+        if (typed.Length == 0)
+        {
+            return null;
+        }
+
+        if (await _db.Users.FirstOrDefaultAsync(u => u.Username == typed, ct) is { } exact)
+        {
+            return exact;
+        }
+
+        var lower = typed.ToLowerInvariant();
+        var matches = await _db.Users.Where(u => u.Username.ToLower() == lower || (u.Email != null && u.Email.ToLower() == lower)).Take(2).ToListAsync(ct);
+        return matches.Count == 1 ? matches[0] : null;
     }
 }

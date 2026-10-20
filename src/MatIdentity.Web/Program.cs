@@ -115,6 +115,9 @@ builder.Services.AddOpenIddict()
 
         // The apps validate access tokens themselves with the published keys: signed, not encrypted.
         options.DisableAccessTokenEncryption();
+        // Refresh tokens roll (each renewal gives a new one, OpenIddict's default). A used one that comes again after the leeway (an app renewing twice
+        // in parallel) is a replay: OpenIddict then revokes every token of that sign-in.
+        options.SetRefreshTokenReuseLeeway(TimeSpan.FromSeconds(Math.Clamp(builder.Configuration.GetValue($"{MatIdentityOptions.SectionName}:RefreshTokenReuseLeewaySeconds", 30), 0, 300)));
         options.SetAccessTokenLifetime(TimeSpan.FromMinutes(Math.Clamp(startConfig.AccessTokenMinutes, SystemConfigService.MinTokenMinutes, SystemConfigService.MaxTokenMinutes)));
 
         if (!string.IsNullOrWhiteSpace(issuer) && SystemConfigService.IsValidIssuer(issuer))
