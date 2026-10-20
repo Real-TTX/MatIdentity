@@ -21,6 +21,9 @@ namespace MatIdentity.Web.Infrastructure;
 /// </summary>
 public static class OidcEndpoints
 {
+    /// <summary>The claim <c>sid</c> (OpenID Connect Front-/Back-Channel Logout): the public id of the session at MatIdentity.</summary>
+    public const string SessionIdClaim = "sid";
+
     public static void MapOidcEndpoints(this WebApplication app)
     {
         app.MapMethods("/connect/authorize", [HttpMethods.Get, HttpMethods.Post], AuthorizeAsync).AllowAnonymous().DisableAntiforgery();
@@ -29,7 +32,7 @@ public static class OidcEndpoints
         app.MapMethods("/connect/logout", [HttpMethods.Get, HttpMethods.Post], LogoutAsync).AllowAnonymous().DisableAntiforgery();
     }
 
-    private static async Task<IResult> AuthorizeAsync(HttpContext http, UserService users, ActivityService activity, PermissionService permissions)
+    private static async Task<IResult> AuthorizeAsync(HttpContext http, UserService users, ActivityService activity, PermissionService permissions, SessionService sessions)
     {
         var request = http.GetOpenIddictServerRequest() ?? throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
         var cookie = await http.AuthenticateAsync(AuthConstants.CookieScheme);
@@ -60,6 +63,13 @@ public static class OidcEndpoints
         }
 
         var identity = BuildIdentity(user, request.GetScopes(), decision.Role);
+        // The session at MatIdentity (sid): the app hears of its end through its back-channel address, and it knows which of its sessions is meant.
+        if (cookie.Principal?.GetSessionToken() is { } sessionToken)
+        {
+            identity.SetClaim(SessionIdClaim, SessionIds.Of(sessionToken));
+            await sessions.AddClientAsync(sessionToken, request.ClientId ?? string.Empty, http.RequestAborted);
+        }
+
         // The access token of a person is meant for the app that asked for it (its own API checks the audience).
         identity.SetResources(request.ClientId ?? string.Empty);
         identity.SetDestinations(Destinations);
@@ -119,6 +129,7 @@ public static class OidcEndpoints
             }
 
             var identity = BuildIdentity(user, result.Principal.GetScopes(), decision.Role);
+            identity.SetClaim(SessionIdClaim, result.Principal.GetClaim(SessionIdClaim));
             identity.SetResources(result.Principal.GetResources());
             identity.SetDestinations(Destinations);
             return Results.SignIn(new ClaimsPrincipal(identity), properties: null, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
@@ -231,6 +242,10 @@ public static class OidcEndpoints
         var principal = claim.Subject!;
         switch (claim.Type)
         {
+            case SessionIdClaim:
+                yield return OpenIddictConstants.Destinations.IdentityToken;
+                yield break;
+
             case Claims.Subject:
                 yield return OpenIddictConstants.Destinations.AccessToken;
                 yield return OpenIddictConstants.Destinations.IdentityToken;

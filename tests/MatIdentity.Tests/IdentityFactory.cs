@@ -41,9 +41,16 @@ public sealed class IdentityFactory : WebApplicationFactory<Program>
     /// <summary>Every mail the site sent.</summary>
     public RecordingMailTransport Mails { get; } = new();
 
+    /// <summary>Every back-channel logout the site sent (address, form).</summary>
+    public System.Collections.Concurrent.ConcurrentQueue<(Uri Address, Dictionary<string, string> Form)> Backchannel { get; } = new();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
         => builder.UseEnvironment("Development")
-            .ConfigureTestServices(services => services.AddSingleton<IMailTransport>(Mails));
+            .ConfigureTestServices(services =>
+            {
+                services.AddSingleton<IMailTransport>(Mails);
+                services.AddHttpClient(BackchannelLogoutWorker.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => new RecordingHttpHandler(Backchannel));
+            });
 
     /// <summary>A client that keeps cookies and does not follow redirects (the tests look at each step).</summary>
     public HttpClient Browser() => CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, HandleCookies = true });

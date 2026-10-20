@@ -69,6 +69,12 @@ builder.Services.AddSingleton<ApiAccess>();
 builder.Services.AddScoped<IMatPlatformApp, IdentityPlatform>();
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<AppRolesReader>();
+// Back-channel logout: when sessions end here, the apps with a back-channel address hear it (signed logout tokens, sent after the answer).
+builder.Services.AddSingleton<BackchannelLogoutQueue>();
+builder.Services.AddScoped<MatIdentity.Core.Auth.ISessionEndListener, BackchannelLogout>();
+builder.Services.AddHostedService<BackchannelLogoutWorker>();
+builder.Services.AddHttpClient(BackchannelLogoutWorker.HttpClientName);
+
 // Mail through MatSMTP when Mattiverse sets MATSMTP_* (MatDesign docs/PLATFORM.md); then the own SMTP settings are fixed.
 var matSmtp = MatPlatform.MatSmtpSettings.From(builder.Configuration);
 builder.Services.AddSingleton(new MatIdentity.Core.Mail.MailRelay

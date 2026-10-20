@@ -16,7 +16,8 @@ namespace MatIdentity.Web.Infrastructure;
 /// GET    /api/v1/clients/{clientId}
 /// PUT    /api/v1/clients/{clientId}          { displayName, homeUrl, redirectUris, postLogoutRedirectUris, allowSignIn, allowMachine, isPublic, managedBy, renewSecret,
 ///                                              roleMode: "matidentity" or "app", roles: [{ key, label }], openToEveryone, callsAllApps,
-///                                              callTargets: ["matsplit", "matidentity"] (by name; MatIdentity's own API only so) }
+///                                              callTargets: ["matsplit", "matidentity"] (by name; MatIdentity's own API only so),
+///                                              backchannelLogoutUri: where the app hears that a person signed out ("" removes it) }
 ///                                            200 { client, clientSecret? }: the secret only when it was made now (a new app, or renewSecret: true)
 /// DELETE /api/v1/clients/{clientId}?managedBy=mattiverse   204, 404, or 409 when the app carries another mark
 /// </code>
@@ -83,6 +84,7 @@ public static class ClientApiEndpoints
                 IsPublic = body.IsPublic ?? existing?.IsPublic ?? false,
                 RedirectUris = body.RedirectUris ?? existing?.RedirectUris ?? [],
                 PostLogoutRedirectUris = body.PostLogoutRedirectUris ?? existing?.PostLogoutRedirectUris ?? [],
+                BackchannelLogoutUri = body.BackchannelLogoutUri ?? existing?.BackchannelLogoutUri,
                 ManagedBy = body.ManagedBy ?? existing?.ManagedBy,
             };
 
@@ -147,7 +149,8 @@ public static class ClientApiEndpoints
         IReadOnlyList<RoleBody>? Roles,
         bool? OpenToEveryone,
         bool? CallsAllApps,
-        IReadOnlyList<string>? CallTargets = null);
+        IReadOnlyList<string>? CallTargets = null,
+        string? BackchannelLogoutUri = null);
 
     public sealed record RoleBody(string? Key, string? Label);
 }

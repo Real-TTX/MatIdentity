@@ -29,6 +29,12 @@ public sealed record ClientInfo
 
     public IReadOnlyList<string> PostLogoutRedirectUris { get; init; } = [];
 
+    /// <summary>
+    /// Where MatIdentity tells the app that a person signed out (OpenID Connect Back-Channel Logout 1.0: a POST with a signed <c>logout_token</c>), so the app ends its
+    /// own session too. Optional; MatIdentity has to reach it (inside Docker the internal address of the app is fine).
+    /// </summary>
+    public string? BackchannelLogoutUri { get; init; }
+
     /// <summary>Who created it: <c>mattiverse</c> when Mattiverse installed the app (docs/PLATFORM.md), else null (an administrator in the UI).</summary>
     public string? ManagedBy { get; init; }
 }
@@ -114,6 +120,11 @@ public static partial class ClientRules
         if (client.PostLogoutRedirectUris.FirstOrDefault(u => !IsValidRedirectUri(u)) is { } badLogout)
         {
             errors["postLogoutRedirectUris"] = $"\"{badLogout}\" is not an absolute http or https address without #.";
+        }
+
+        if (!string.IsNullOrWhiteSpace(client.BackchannelLogoutUri) && !IsValidRedirectUri(client.BackchannelLogoutUri))
+        {
+            errors["backchannelLogoutUri"] = "Enter an absolute http or https address without #, like http://matsplit:8080/signout-backchannel.";
         }
 
         if (!string.IsNullOrWhiteSpace(client.HomeUrl) && !IsValidHomeUrl(client.HomeUrl))

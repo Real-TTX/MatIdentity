@@ -21,4 +21,7 @@ public class UserSession : AuditableEntity
     public string? UserAgent { get; set; }
 
     public string? IpAddress { get; set; }
+
+    /// <summary>The apps this session signed in to (client ids, separated by spaces): they hear of its end (back-channel logout).</summary>
+    public string? ClientIds { get; set; }
 }

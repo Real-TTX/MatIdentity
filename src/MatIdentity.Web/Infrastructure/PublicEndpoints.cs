@@ -29,6 +29,13 @@ public sealed class PublicEndpoints : IOpenIddictServerHandler<ApplyConfiguratio
 
     public ValueTask HandleAsync(ApplyConfigurationResponseContext context)
     {
+        if (string.IsNullOrEmpty(context.Response.Error))
+        {
+            // OpenID Connect Back-Channel Logout 1.0: an app with a back-channel address hears of a sign-out here (with the sid of the ID token).
+            context.Response["backchannel_logout_supported"] = true;
+            context.Response["backchannel_logout_session_supported"] = true;
+        }
+
         // Without a configured issuer the document keeps the address of the request; an error answer has no endpoints.
         if (context.Options.Issuer is not { } issuer || !string.IsNullOrEmpty(context.Response.Error))
         {

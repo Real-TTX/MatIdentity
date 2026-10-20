@@ -16,11 +16,13 @@ public sealed class SessionService
 
     private readonly MatIdentityDbContext _db;
     private readonly SystemConfigService _config;
+    private readonly ISessionEndListener _listener;
 
-    public SessionService(MatIdentityDbContext db, SystemConfigService config)
+    public SessionService(MatIdentityDbContext db, SystemConfigService config, ISessionEndListener listener)
     {
         _db = db;
         _config = config;
+        _listener = listener;
     }
 
     public async Task<UserSession> CreateAsync(long userId, string? userAgent, string? ipAddress, CancellationToken ct = default)
@@ -77,29 +79,40 @@ public sealed class SessionService
             return;
         }
 
-        var session = await _db.UserSessions.FirstOrDefaultAsync(s => s.Token == token, ct);
+        var session = await _db.UserSessions.Include(s => s.User).FirstOrDefaultAsync(s => s.Token == token, ct);
         if (session is not null)
         {
             _db.UserSessions.Remove(session); // soft delete
             await _db.SaveChangesAsync(ct);
+            await _listener.SessionsEndedAsync(Ended([session]), everywhere: false, ct);
         }
     }
 
     /// <summary>Ends every session of a person (a password was changed by an administrator, the account was disabled). Returns how many.</summary>
     public async Task<int> InvalidateAllAsync(long userId, string? exceptToken = null, CancellationToken ct = default)
     {
-        var sessions = await _db.UserSessions.Where(s => s.UserId == userId && s.Token != exceptToken).ToListAsync(ct);
+        var sessions = await _db.UserSessions.Include(s => s.User).Where(s => s.UserId == userId && s.Token != exceptToken).ToListAsync(ct);
         _db.UserSessions.RemoveRange(sessions);
         await _db.SaveChangesAsync(ct);
+
+        // Without an exception the person is out everywhere (disabled, a new password set by an administrator); with one, only the other devices are.
+        var ended = Ended(sessions);
+        if (exceptToken is null && ended.Count == 0 && await _db.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Id == userId, ct) is { } user)
+        {
+            ended = [new EndedSession(user.Subject, string.Empty, [])];
+        }
+
+        await _listener.SessionsEndedAsync(ended, everywhere: exceptToken is null, ct);
         return sessions.Count;
     }
 
     /// <summary>Ends every session of every person: everyone has to sign in again (the action "Sign everyone out"). Returns how many.</summary>
     public async Task<int> InvalidateEveryoneAsync(CancellationToken ct = default)
     {
-        var sessions = await _db.UserSessions.ToListAsync(ct);
+        var sessions = await _db.UserSessions.Include(s => s.User).ToListAsync(ct);
         _db.UserSessions.RemoveRange(sessions);
         await _db.SaveChangesAsync(ct);
+        await _listener.SessionsEndedAsync(Ended(sessions), everywhere: false, ct);
         return sessions.Count;
     }
 
@@ -118,6 +131,29 @@ public sealed class SessionService
         var now = DateTime.UtcNow;
         return _db.UserSessions.CountAsync(s => s.ExpiresAt > now, ct);
     }
+
+    /// <summary>The person signed in to an app from this session: the app hears of the end of it.</summary>
+    public async Task AddClientAsync(string token, string clientId, CancellationToken ct = default)
+    {
+        var session = await _db.UserSessions.FirstOrDefaultAsync(s => s.Token == token, ct);
+        var ids = (session?.ClientIds ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (session is null || ids.Contains(clientId, StringComparer.Ordinal))
+        {
+            return;
+        }
+
+        var joined = string.Join(' ', ids.Append(clientId));
+        if (joined.Length <= 2000)
+        {
+            session.ClientIds = joined;
+            await _db.SaveChangesAsync(ct);
+        }
+    }
+
+    private static List<EndedSession> Ended(IEnumerable<UserSession> sessions)
+        => sessions.Where(s => s.User is not null)
+            .Select(s => new EndedSession(s.User!.Subject, SessionIds.Of(s.Token), (s.ClientIds ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries)))
+            .ToList();
 
     private static string? Truncate(string? value, int maxLength)
         => value is { Length: > 0 } && value.Length > maxLength ? value[..maxLength] : value;

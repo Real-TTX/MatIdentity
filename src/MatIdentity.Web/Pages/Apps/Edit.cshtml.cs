@@ -82,6 +82,9 @@ public class EditModel : PageModel
         [Display(Name = "Addresses after sign-out")]
         public string? PostLogoutRedirectUris { get; set; }
 
+        [Display(Name = "Sign-out address of the app")]
+        public string? BackchannelLogoutUri { get; set; }
+
         /// <summary>It may call every app, also those added later (Mattiverse).</summary>
         public bool CallsAllApps { get; set; }
 
@@ -149,6 +152,7 @@ public class EditModel : PageModel
             IsPublic = existing?.IsPublic ?? Input.IsPublic,
             RedirectUris = Input.AllowSignIn ? ClientRules.SplitUris(Input.RedirectUris) : [],
             PostLogoutRedirectUris = Input.AllowSignIn ? ClientRules.SplitUris(Input.PostLogoutRedirectUris) : [],
+            BackchannelLogoutUri = Input.AllowSignIn ? Input.BackchannelLogoutUri : null,
             ManagedBy = existing?.ManagedBy,
         }, renewSecret: false, HttpContext.RequestAborted);
 
@@ -221,6 +225,7 @@ public class EditModel : PageModel
             IsPublic = client.IsPublic,
             RedirectUris = string.Join('\n', client.RedirectUris),
             PostLogoutRedirectUris = string.Join('\n', client.PostLogoutRedirectUris),
+            BackchannelLogoutUri = client.BackchannelLogoutUri,
         };
     }
 }

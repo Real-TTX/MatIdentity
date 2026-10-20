@@ -108,6 +108,9 @@ else
                         <mat-field label="Addresses after sign-out" asp-for="Input.PostLogoutRedirectUris" hint="One per line. Optional: where the app may send people after they signed out.">
                             <textarea asp-for="Input.PostLogoutRedirectUris" class="mat-textarea mat-mono" rows="2" placeholder="https://split.example.com/signout-callback-oidc"></textarea>
                         </mat-field>
+                        <mat-field label="Sign-out address of the app" asp-for="Input.BackchannelLogoutUri" hint="Optional. When a person signs out here, MatIdentity tells the app at this address, and the app ends its session too (back-channel logout). MatIdentity has to reach it.">
+                            <input asp-for="Input.BackchannelLogoutUri" type="url" class="mat-input mat-mono" placeholder="http://matsplit:8080/signout-backchannel" data-msg-type="Enter an absolute address." />
+                        </mat-field>
                     </div>
                 </div>
             </div>

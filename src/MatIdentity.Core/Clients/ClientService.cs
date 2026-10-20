@@ -16,6 +16,7 @@ public sealed class ClientService
     // Our own values in the properties of an OpenIddict application.
     private const string HomeProperty = "mat_home";
     private const string ManagedByProperty = "mat_managed_by";
+    private const string BackchannelProperty = "mat_backchannel_logout";
 
     private readonly IOpenIddictApplicationManager _applications;
     private readonly IOpenIddictScopeManager _scopes;
@@ -133,6 +134,12 @@ public sealed class ClientService
 
         descriptor.Properties.Remove(HomeProperty);
         descriptor.Properties.Remove(ManagedByProperty);
+        descriptor.Properties.Remove(BackchannelProperty);
+        if (!string.IsNullOrWhiteSpace(client.BackchannelLogoutUri))
+        {
+            descriptor.Properties[BackchannelProperty] = JsonSerializer.SerializeToElement(client.BackchannelLogoutUri);
+        }
+
         if (!string.IsNullOrWhiteSpace(client.HomeUrl))
         {
             descriptor.Properties[HomeProperty] = JsonSerializer.SerializeToElement(client.HomeUrl);
@@ -295,6 +302,7 @@ public sealed class ClientService
             PostLogoutRedirectUris = [.. await _applications.GetPostLogoutRedirectUrisAsync(app, ct)],
             HomeUrl = properties.TryGetValue(HomeProperty, out var home) && home.ValueKind == JsonValueKind.String ? home.GetString() : null,
             ManagedBy = properties.TryGetValue(ManagedByProperty, out var by) && by.ValueKind == JsonValueKind.String ? by.GetString() : null,
+            BackchannelLogoutUri = properties.TryGetValue(BackchannelProperty, out var back) && back.ValueKind == JsonValueKind.String ? back.GetString() : null,
         };
     }
 
@@ -304,6 +312,7 @@ public sealed class ClientService
         DisplayName = client.DisplayName?.Trim() ?? string.Empty,
         HomeUrl = string.IsNullOrWhiteSpace(client.HomeUrl) ? null : client.HomeUrl.Trim(),
         ManagedBy = string.IsNullOrWhiteSpace(client.ManagedBy) ? null : client.ManagedBy.Trim(),
+        BackchannelLogoutUri = string.IsNullOrWhiteSpace(client.BackchannelLogoutUri) ? null : client.BackchannelLogoutUri.Trim(),
         RedirectUris = client.RedirectUris.Select(u => u.Trim()).Where(u => u.Length > 0).Distinct(StringComparer.Ordinal).ToList(),
         PostLogoutRedirectUris = client.PostLogoutRedirectUris.Select(u => u.Trim()).Where(u => u.Length > 0).Distinct(StringComparer.Ordinal).ToList(),
     };
