@@ -19,5 +19,12 @@
             <p class="mat-muted">It was used already, it is too old, or the address has changed since. Ask for a new one on your account page.</p>
         }
     </div>
-    <a class="mat-btn mat-btn--primary mat-btn--block" href="/"><icon name="home" /><span>Your apps</span></a>
+@if (Model.Email is not null && User.Identity?.IsAuthenticated != true)
+    {
+        <a class="mat-btn mat-btn--primary mat-btn--block" href="/Account/Login"><icon name="login" /><span>Sign in</span></a>
+    }
+    else
+    {
+            <a class="mat-btn mat-btn--primary mat-btn--block" href="/"><icon name="home" /><span>Your apps</span></a>
+    }
 </div>

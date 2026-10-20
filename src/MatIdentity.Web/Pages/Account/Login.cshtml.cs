@@ -58,6 +58,9 @@ public class LoginModel : PageModel
     /// <summary>"Forgot your password?" is offered (mail and a public address).</summary>
     public bool CanReset { get; private set; }
 
+    /// <summary>People may create their own account.</summary>
+    public bool CanRegister { get; private set; }
+
     public string? ErrorMessage { get; private set; }
 
     public string InstanceName { get; private set; } = Support.Ui.App.Name;
@@ -131,6 +134,7 @@ public class LoginModel : PageModel
     {
         InstanceName = (await _config.GetAsync(HttpContext.RequestAborted)).InstanceName;
         CanReset = await ForgotModel.LinkBaseAsync(HttpContext, _mail, _config, _configuration) is not null;
+        CanRegister = CanReset && await RegisterModel.OfferedAsync(HttpContext, _mail, _config, _configuration);
     }
 
     private string SafeReturnUrl()

@@ -54,7 +54,7 @@ public sealed class AuthService
         // enumerate usernames.
         if (!user.IsActive)
         {
-            return AuthenticationResult.Failure("This account is disabled.");
+            return AuthenticationResult.Failure(user.PendingRegistration ? "Confirm your e-mail address first: the link is in your mail." : "This account is disabled.");
         }
 
         user.LastLoginAt = DateTime.UtcNow;

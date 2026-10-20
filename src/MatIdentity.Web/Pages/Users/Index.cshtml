@@ -37,7 +37,11 @@
                             <td data-label="E-mail" class="mat-hide-sm">@(u.Email ?? "–")</td>
                             <td data-label="Role">@u.Role</td>
                             <td data-label="Status">
-                                @if (u.IsActive && u.LockedUntil > DateTime.UtcNow)
+                                @if (u.PendingRegistration)
+                                {
+                                    <span class="mat-pill">Unconfirmed</span>
+                                }
+                                else if (u.IsActive && u.LockedUntil > DateTime.UtcNow)
                                 {
                                     <span class="mat-pill mat-pill--warn">Locked</span>
                                 }

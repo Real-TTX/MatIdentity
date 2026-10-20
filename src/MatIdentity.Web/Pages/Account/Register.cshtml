@@ -1,0 +1,45 @@
+@page
+@model MatIdentity.Web.Pages.Account.RegisterModel
+@{
+    Layout = "_Bare";
+    ViewData["Title"] = "Create an account";
+}
+
+<div class="mat-auth__card">
+    <div class="mat-auth__brand">
+        @Ui.Logo("lg")
+        <h1>Create an account</h1>
+        <p class="mat-muted">One account for the apps here. It works once you confirm your e-mail address.</p>
+    </div>
+
+    @if (Model.Done)
+    {
+        <div class="mat-alert mat-alert--success" role="status"><icon name="mail" /><div class="mat-alert__body">Almost done: open the link we sent to @Model.Input.Email within 48 hours, then sign in.</div></div>
+    }
+    else
+    {
+        <form method="post" class="mat-form" novalidate>
+            <partial name="_ValidationSummary" />
+            <mat-field label="Username" asp-for="Input.Username" required="true">
+                <input asp-for="Input.Username" class="mat-input" autocomplete="username" autofocus required data-msg-required="Please choose a username." />
+            </mat-field>
+            <mat-field label="Display name" asp-for="Input.DisplayName" hint="Optional. What the apps show.">
+                <input asp-for="Input.DisplayName" class="mat-input" autocomplete="name" />
+            </mat-field>
+            <mat-field label="E-mail" asp-for="Input.Email" required="true">
+                <input asp-for="Input.Email" type="email" class="mat-input" autocomplete="email" required data-msg-required="Please enter your e-mail address." data-msg-type="Please enter a valid e-mail address." />
+            </mat-field>
+            <mat-field label="Password" asp-for="Input.Password" required="true" hint="At least @Model.MinPasswordLength characters, not your user name.">
+                <input asp-for="Input.Password" type="password" class="mat-input" autocomplete="new-password" required minlength="@Model.MinPasswordLength" data-msg-required="Please choose a password." data-msg-range="Use at least @Model.MinPasswordLength characters." />
+            </mat-field>
+            <mat-field label="Confirm password" asp-for="Input.ConfirmPassword" required="true">
+                <input asp-for="Input.ConfirmPassword" type="password" class="mat-input" autocomplete="new-password" required data-msg-required="Please repeat the password." />
+            </mat-field>
+            <div class="mat-btn-row mat-btn-row--plain">
+                <button type="submit" class="mat-btn mat-btn--primary mat-btn--block"><icon name="user" /><span>Create the account</span></button>
+            </div>
+        </form>
+    }
+
+    <a class="mat-btn mat-btn--ghost mat-btn--block" href="/Account/Login">Back to sign-in</a>
+</div>

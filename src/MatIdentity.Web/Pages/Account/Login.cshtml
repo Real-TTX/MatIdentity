@@ -58,4 +58,9 @@
     {
         <a class="mat-btn mat-btn--ghost mat-btn--block" href="/Account/Forgot@(string.IsNullOrEmpty(Model.ReturnUrl) ? string.Empty : "?returnUrl=" + Uri.EscapeDataString(Model.ReturnUrl))">Forgot your password?</a>
     }
+
+    @if (Model.CanRegister)
+    {
+        <p class="mat-hint">New here? <a href="/Account/Register">Create an account</a></p>
+    }
 </div>

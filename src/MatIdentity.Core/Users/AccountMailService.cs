@@ -86,6 +86,22 @@ public sealed class AccountMailService
         return true;
     }
 
+    /// <summary>
+    /// A person makes an account (registration is on): disabled until they follow the link to their address. An address that belongs to an account already gets
+    /// nothing and the caller answers the same (no hint which addresses are known). The user name must be free (the caller checks it).
+    /// </summary>
+    public async Task<User?> RegisterAsync(string username, string displayName, string email, string password, string linkBase, CancellationToken ct = default)
+    {
+        if (await _users.EmailExistsAsync(email, null, ct))
+        {
+            return null;
+        }
+
+        var user = await _users.RegisterAsync(username, displayName, email, password, ct);
+        await SendVerificationAsync(user, linkBase, ct);
+        return user;
+    }
+
     /// <summary>The open link for a new password (a reset or an invitation), or null when it is used, expired or unknown.</summary>
     public Task<AccountToken?> FindPasswordLinkAsync(string? key, CancellationToken ct = default) => _tokens.FindAsync(key, PasswordPurposes, ct);
 
@@ -122,6 +138,12 @@ public sealed class AccountMailService
 
         await _tokens.UseAsync(token, ct);
         await _users.SetEmailVerifiedAsync(user.Id, ct);
+        if (user.PendingRegistration)
+        {
+            // A registration: the confirmed address makes the account work.
+            await _users.ActivateRegistrationAsync(user.Id, ct);
+        }
+
         return user;
     }
 

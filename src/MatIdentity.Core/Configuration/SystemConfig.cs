@@ -20,6 +20,9 @@ public sealed class SystemConfig
     /// <summary>How long an access token is valid, in minutes. Short, because an app renews it with the refresh token.</summary>
     public int AccessTokenMinutes { get; set; } = 30;
 
+    /// <summary>People may create their own account (/Account/Register); off by default. Needs mail and the public address: the account works after the address is confirmed.</summary>
+    public bool AllowRegistration { get; set; }
+
     /// <summary>The shortest password a person may choose (8 to 128).</summary>
     public int PasswordMinLength { get; set; } = 8;
 

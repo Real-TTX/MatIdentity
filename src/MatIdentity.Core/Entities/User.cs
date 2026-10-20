@@ -26,6 +26,9 @@ public class User : AuditableEntity
 
     public bool IsActive { get; set; } = true;
 
+    /// <summary>The person created the account themselves and has not confirmed the address yet: it stays disabled until then.</summary>
+    public bool PendingRegistration { get; set; }
+
     /// <summary>Forces a password change on next login (e.g. for a seeded admin).</summary>
     public bool MustChangePassword { get; set; }
 

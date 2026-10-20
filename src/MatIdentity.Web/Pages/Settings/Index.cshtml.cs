@@ -79,6 +79,8 @@ public class IndexModel : PageModel
         [Range(MatIdentity.Core.Users.PasswordPolicy.Floor, MatIdentity.Core.Users.PasswordPolicy.Ceiling, ErrorMessage = "Choose between 8 and 128 characters.")]
         public int PasswordMinLength { get; set; } = 8;
 
+        public bool AllowRegistration { get; set; }
+
         public string? SmtpHost { get; set; }
 
         [Range(1, 65535, ErrorMessage = "Choose a port between 1 and 65535.")]
@@ -104,6 +106,7 @@ public class IndexModel : PageModel
             SessionLifetimeDays = config.SessionLifetimeDays,
             AccessTokenMinutes = config.AccessTokenMinutes,
             PasswordMinLength = config.PasswordMinLength,
+            AllowRegistration = config.AllowRegistration,
             SmtpHost = config.SmtpHost,
             SmtpPort = config.SmtpPort,
             SmtpUsername = config.SmtpUsername,
@@ -134,6 +137,7 @@ public class IndexModel : PageModel
         config.SessionLifetimeDays = Input.SessionLifetimeDays;
         config.AccessTokenMinutes = Input.AccessTokenMinutes;
         config.PasswordMinLength = Input.PasswordMinLength;
+        config.AllowRegistration = Input.AllowRegistration;
         if (!Relay.IsConfigured)
         {
             // MatSMTP fixes the mail; else the own server (an empty password keeps the stored one, an empty server switches mail off).

@@ -34,6 +34,14 @@
             <mat-field label="Shortest password" asp-for="Input.PasswordMinLength" required="true" hint="For new passwords. Never the user name, never one of the passwords tried first.">
                 <input asp-for="Input.PasswordMinLength" type="number" class="mat-input" min="8" max="128" required data-msg-range="Choose between 8 and 128 characters." />
             </mat-field>
+            <div class="mat-field mat-field--full">
+                <span class="mat-label">Registration</span>
+                <label class="mat-check">
+                    <input asp-for="Input.AllowRegistration" type="checkbox" />
+                    <span class="mat-check__text">People may create their own account</span>
+                </label>
+                <span class="mat-hint">On the sign-in page, with mail and the public address. The account works after the e-mail address is confirmed and gets only the apps open to everyone.</span>
+            </div>
         </div>
     </div>
 

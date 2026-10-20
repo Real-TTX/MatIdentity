@@ -479,6 +479,9 @@ namespace MatIdentity.Core.Data.Migrations
                         .HasMaxLength(512)
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("PendingRegistration")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("RecoveryCodeHashes")
                         .HasMaxLength(1000)
                         .HasColumnType("TEXT");

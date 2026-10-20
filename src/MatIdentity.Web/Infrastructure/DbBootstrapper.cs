@@ -38,6 +38,9 @@ public static class DbBootstrapper
         await provider.GetRequiredService<ActivityService>().PruneAsync(ActivityDays);
 
         var users = provider.GetRequiredService<UserService>();
+        // Registrations whose address was never confirmed.
+        await users.PruneUnconfirmedAsync(MatIdentity.Web.Pages.Account.RegisterModel.ConfirmDays);
+
         var options = provider.GetRequiredService<IOptions<MatIdentityOptions>>().Value;
         var environment = provider.GetRequiredService<IHostEnvironment>();
 

@@ -59,7 +59,7 @@ public sealed class IdentityPlatform : IMatPlatformApp
             new MatPage("settings", "Settings", "settings",
             [
                 new MatSection("form", ["instanceName", "issuer"], Label: "General"),
-                new MatSection("form", ["sessionLifetimeDays", "accessTokenMinutes", "passwordMinLength"], Label: "Sign-in"),
+                new MatSection("form", ["sessionLifetimeDays", "accessTokenMinutes", "passwordMinLength", "allowRegistration"], Label: "Sign-in"),
                 new MatSection("form", MailKeys, Label: "Mail"),
             ]),
         ],
@@ -96,6 +96,7 @@ public sealed class IdentityPlatform : IMatPlatformApp
                 Required = true, Min = MatIdentity.Core.Users.PasswordPolicy.Floor, Max = MatIdentity.Core.Users.PasswordPolicy.Ceiling,
                 Hint = "For new passwords.",
             },
+            new MatField("allowRegistration", "People may create their own account", "bool") { Hint = "Needs mail and the public address; the account works after the address is confirmed." },
             .. MailFields(),
         ],
         Actions =
@@ -169,6 +170,7 @@ public sealed class IdentityPlatform : IMatPlatformApp
             ["sessionLifetimeDays"] = config.SessionLifetimeDays,
             ["accessTokenMinutes"] = config.AccessTokenMinutes,
             ["passwordMinLength"] = config.PasswordMinLength,
+            ["allowRegistration"] = config.AllowRegistration,
             ["smtpHost"] = _mail.Relay.Target?.Host ?? config.SmtpHost,
             ["smtpPort"] = _mail.Relay.Target?.Port ?? config.SmtpPort,
             ["smtpTls"] = _mail.Relay.Target is { } relay ? SmtpTarget.Name(relay.Tls) : config.SmtpTls,
@@ -233,6 +235,12 @@ public sealed class IdentityPlatform : IMatPlatformApp
                     break;
                 case "passwordMinLength" when value.TryGetInt32Strict(out var length):
                     config.PasswordMinLength = length;
+                    break;
+                case "allowRegistration" when value.ValueKind is JsonValueKind.True or JsonValueKind.False:
+                    config.AllowRegistration = value.GetBoolean();
+                    break;
+                case "allowRegistration":
+                    errors[key] = "Enter true or false.";
                     break;
                 case "instanceName" or "issuer":
                     errors[key] = "Enter a text.";

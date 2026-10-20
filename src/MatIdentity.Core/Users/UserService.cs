@@ -80,6 +80,11 @@ public sealed class UserService
         user.Email = newEmail;
         user.Role = role;
         user.IsActive = isActive;
+        if (isActive)
+        {
+            // An administrator who enables a registration confirms it.
+            user.PendingRegistration = false;
+        }
 
         if (!string.IsNullOrEmpty(newPassword))
         {
@@ -121,6 +126,37 @@ public sealed class UserService
         user.LockedUntil = null;
         await _db.SaveChangesAsync(ct);
         return true;
+    }
+
+    /// <summary>An account a person made themselves: disabled until the address is confirmed (<see cref="ActivateRegistrationAsync"/>).</summary>
+    public async Task<User> RegisterAsync(string username, string displayName, string email, string password, CancellationToken ct = default)
+    {
+        var user = await CreateAsync(username, displayName, email, password, UserRole.User, mustChangePassword: false, ct);
+        user.IsActive = false;
+        user.PendingRegistration = true;
+        await _db.SaveChangesAsync(ct);
+        return user;
+    }
+
+    /// <summary>The address of a registration is confirmed: the account works.</summary>
+    public async Task ActivateRegistrationAsync(long id, CancellationToken ct = default)
+    {
+        if (await _db.Users.FirstOrDefaultAsync(u => u.Id == id && u.PendingRegistration, ct) is { } user)
+        {
+            user.PendingRegistration = false;
+            user.IsActive = true;
+            await _db.SaveChangesAsync(ct);
+        }
+    }
+
+    /// <summary>Removes registrations whose address was not confirmed within <paramref name="days"/> days. Returns how many.</summary>
+    public async Task<int> PruneUnconfirmedAsync(int days, CancellationToken ct = default)
+    {
+        var limit = DateTime.UtcNow.AddDays(-days);
+        var stale = await _db.Users.Where(u => u.PendingRegistration && u.CreateDate < limit).ToListAsync(ct);
+        _db.Users.RemoveRange(stale);
+        await _db.SaveChangesAsync(ct);
+        return stale.Count;
     }
 
     /// <summary>The person proved the address (a link in a mail to it).</summary>
