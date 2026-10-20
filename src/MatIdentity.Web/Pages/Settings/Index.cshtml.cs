@@ -186,6 +186,14 @@ public class IndexModel : PageModel
         return RedirectToPage();
     }
 
+    /// <summary>The configuration as JSON (never a secret), as a download.</summary>
+    public async Task<IActionResult> OnGetExportAsync([FromServices] ConfigurationExport export)
+    {
+        var bytes = await export.CreateAsync(HttpContext.RequestAborted);
+        await _activity.WriteAsync(ActivityKind.ConfigurationExported, username: User.GetUsername(), ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString(), ct: HttpContext.RequestAborted);
+        return File(bytes, "application/json", $"matidentity-configuration-{DateTime.UtcNow:yyyyMMdd}.json");
+    }
+
     public async Task<IActionResult> OnPostSignOutEveryoneAsync()
     {
         var (sessions, tokens) = await IdentityPlatform.SignOutEveryoneAsync(_sessions, _revoker, HttpContext.RequestAborted);

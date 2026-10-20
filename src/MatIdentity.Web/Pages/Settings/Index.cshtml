@@ -101,6 +101,16 @@
 </div>
 
 <div class="mat-card">
+    <div class="mat-card__head"><icon name="download" /><span class="mat-card__title">Configuration</span></div>
+    <div class="mat-card__body mat-stack">
+        <p class="mat-muted">Settings, apps with their access and roles, groups and people as JSON, without any secret. A backup is the data volume: it also holds the keys that sign the tokens.</p>
+        <div class="mat-btn-row mat-btn-row--plain">
+            <a class="mat-btn mat-btn--secondary" href="/Settings?handler=Export"><icon name="download" /><span>Download the configuration</span></a>
+        </div>
+    </div>
+</div>
+
+<div class="mat-card">
     <div class="mat-card__head"><icon name="alert" /><span class="mat-card__title">Emergency</span></div>
     <div class="mat-card__body mat-stack">
         <p class="mat-muted">Ends every sign-in: here and, at their next renewal, in every app. Everyone signs in again, you too.</p>
