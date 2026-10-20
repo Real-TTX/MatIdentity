@@ -208,8 +208,8 @@ public class EditModel : PageModel
         var sent = await _accounts.RequestPasswordResetAsync(user.Username, linkBase, HttpContext.RequestAborted) is not null;
         if (sent)
         {
-            await _activity.WriteAsync(ActivityKind.PasswordResetSent, user, ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString(),
-                detail: "By " + User.GetUsername(), ct: HttpContext.RequestAborted);
+            await _activity.WriteAsync(ActivityKind.PasswordResetSent, username: User.GetUsername(), ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString(),
+                detail: user.Username, ct: HttpContext.RequestAborted);
         }
 
         StatusMessage = sent
@@ -225,8 +225,8 @@ public class EditModel : PageModel
         var error = await _accounts.InviteAsync(user, linkBase, User.GetDisplayName(), HttpContext.RequestAborted);
         if (error is null)
         {
-            await _activity.WriteAsync(ActivityKind.InvitationSent, user, ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString(),
-                detail: "By " + User.GetUsername(), ct: HttpContext.RequestAborted);
+            await _activity.WriteAsync(ActivityKind.InvitationSent, username: User.GetUsername(), ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString(),
+                detail: user.Username, ct: HttpContext.RequestAborted);
         }
 
         StatusMessage = error is null ? $"The invitation is on its way to {user.Email}." : "The invitation was not sent. " + error;

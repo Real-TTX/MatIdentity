@@ -35,7 +35,7 @@
                     <input asp-for="Input.DisplayName" class="mat-input" required data-msg-required="Please enter a display name." />
                 </mat-field>
 
-                <mat-field label="E-mail" asp-for="Input.Email" hint="Optional. An app links an existing account by it.">
+                <mat-field label="E-mail" asp-for="Input.Email" hint="@(Model.MailAvailable && !Model.IsEdit ? "An app links an existing account by it. The invitation goes there." : "Optional. An app links an existing account by it.")">
                     <input asp-for="Input.Email" type="email" class="mat-input" autocomplete="off" data-msg-type="Please enter a valid e-mail address." />
                 </mat-field>
 
