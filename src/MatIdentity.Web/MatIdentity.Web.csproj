@@ -10,6 +10,9 @@
 
   <ItemGroup>
     <PackageReference Include="Fido2.AspNet" Version="4.3.0" />
+    <!-- MatPlatform (a copy in MatPlatform/, MatDesign) needs them to compile; MatIdentity uses its MatSmtpSettings. -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.13" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.13" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.13">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>

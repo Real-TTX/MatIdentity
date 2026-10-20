@@ -3,6 +3,9 @@ using System.Net;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
+using MatIdentity.Core.Mail;
 
 namespace MatIdentity.Tests;
 
@@ -25,9 +28,21 @@ public sealed class IdentityFactory : WebApplicationFactory<Program>
         Environment.SetEnvironmentVariable("MatIdentity__RateLimits__SignIn", "10000");
         // A replayed refresh token is caught at once (the default leeway is for apps that renew twice in parallel).
         Environment.SetEnvironmentVariable("MatIdentity__RefreshTokenReuseLeewaySeconds", "0");
+        // Mail through MatSMTP (as Mattiverse sets it); the transport is replaced, nothing leaves the test.
+        Environment.SetEnvironmentVariable("MATSMTP_HOST", "matsmtp.test");
+        Environment.SetEnvironmentVariable("MATSMTP_PORT", "2025");
+        Environment.SetEnvironmentVariable("MATSMTP_USERNAME", "matidentity");
+        Environment.SetEnvironmentVariable("MATSMTP_PASSWORD", "relay-secret-1234");
+        Environment.SetEnvironmentVariable("MATSMTP_FROM", "id@example.test");
+        Environment.SetEnvironmentVariable("MATSMTP_TLS", "none");
     }
 
-    protected override void ConfigureWebHost(IWebHostBuilder builder) => builder.UseEnvironment("Development");
+    /// <summary>Every mail the site sent.</summary>
+    public RecordingMailTransport Mails { get; } = new();
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+        => builder.UseEnvironment("Development")
+            .ConfigureTestServices(services => services.AddSingleton<IMailTransport>(Mails));
 
     /// <summary>A client that keeps cookies and does not follow redirects (the tests look at each step).</summary>
     public HttpClient Browser() => CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, HandleCookies = true });
@@ -55,6 +70,26 @@ public sealed class IdentityFactory : WebApplicationFactory<Program>
         }));
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         return response.Headers.Location!.OriginalString;
+    }
+
+    /// <summary>
+    /// Opens <paramref name="page"/> (for its anti-forgery token) and posts <paramref name="fields"/> to <paramref name="action"/> (default: the page itself).
+    /// </summary>
+    public static async Task<HttpResponseMessage> PostFormAsync(HttpClient browser, string page, Dictionary<string, string> fields, string? action = null)
+    {
+        var form = await browser.GetStringAsync(page);
+        var token = Regex.Match(form, @"name=""__RequestVerificationToken"" type=""hidden"" value=""([^""]+)""").Groups[1].Value;
+        Assert.False(string.IsNullOrEmpty(token), "The page has no form: " + page);
+        fields["__RequestVerificationToken"] = token;
+        return await browser.PostAsync(action ?? page, new FormUrlEncodedContent(fields));
+    }
+
+    /// <summary>A browser signed in as the development account (an administrator).</summary>
+    public async Task<HttpClient> AdminAsync()
+    {
+        var browser = Browser();
+        await SignInAsync(browser, "/Account/Login");
+        return browser;
     }
 
     protected override void Dispose(bool disposing)

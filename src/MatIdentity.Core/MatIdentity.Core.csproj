@@ -12,6 +12,10 @@
     <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.13" />
     <PackageReference Include="OpenIddict.Core" Version="7.7.2" />
     <PackageReference Include="OpenIddict.EntityFrameworkCore" Version="7.7.2" />
+    <!-- The mail (password reset, invitations, e-mail verification): through MatSMTP or an own SMTP server. -->
+    <PackageReference Include="MailKit" Version="4.18.1" />
+    <!-- MailKit brings an older one with known vulnerabilities: pinned to the patched release. -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
   </ItemGroup>
 
 </Project>

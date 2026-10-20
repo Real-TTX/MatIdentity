@@ -18,6 +18,13 @@ services:
     # environment:
     #   MatIdentity__Issuer: https://id.example.com     # the public address (the iss of the tokens)
     #   MAT_API_KEY: <a long random key>                 # the key of the platform API (Mattiverse sets it)
+    #   # Mail through MatSMTP (Mattiverse sets these; without them the SMTP server of Settings, or no mail):
+    #   MATSMTP_HOST: mattiverse-matsmtp-matsmtp
+    #   MATSMTP_PORT: "2025"
+    #   MATSMTP_USERNAME: matidentity
+    #   MATSMTP_PASSWORD: <the relay password>
+    #   MATSMTP_FROM: id@example.com
+    #   MATSMTP_TLS: none                                # none, starttls or tls
     volumes:
       # Database, settings and the keys that sign the tokens: back it up like a password safe.
       - matidentity-data:/data

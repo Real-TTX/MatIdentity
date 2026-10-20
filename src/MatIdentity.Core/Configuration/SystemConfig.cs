@@ -19,4 +19,20 @@ public sealed class SystemConfig
 
     /// <summary>How long an access token is valid, in minutes. Short, because an app renews it with the refresh token.</summary>
     public int AccessTokenMinutes { get; set; } = 30;
+
+    /// <summary>The own SMTP server (used when MatSMTP is not set); empty: no mail, unless MatSMTP is there.</summary>
+    public string? SmtpHost { get; set; }
+
+    public int SmtpPort { get; set; } = 587;
+
+    public string? SmtpUsername { get; set; }
+
+    /// <summary>The password of the SMTP user, encrypted with Data Protection (never in plain text).</summary>
+    public string? SmtpPasswordProtected { get; set; }
+
+    /// <summary>The sender of every mail (<c>id@example.com</c>).</summary>
+    public string? SmtpFrom { get; set; }
+
+    /// <summary><c>none</c>, <c>starttls</c> or <c>tls</c>.</summary>
+    public string SmtpTls { get; set; } = "starttls";
 }

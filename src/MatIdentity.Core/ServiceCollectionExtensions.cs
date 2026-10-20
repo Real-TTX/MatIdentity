@@ -5,6 +5,7 @@ using MatIdentity.Core.Configuration;
 using MatIdentity.Core.Security;
 using MatIdentity.Core.Users;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace MatIdentity.Core;
 
@@ -21,6 +22,13 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ISecretProtector, DataProtectionSecretProtector>();
         services.AddSingleton<JsonConfigStore>();
         services.AddSingleton<SystemConfigService>();
+
+        // Mail: MatSMTP (the web project registers its MailRelay from MATSMTP_*) or the own server of the settings.
+        services.TryAddSingleton(new MatIdentity.Core.Mail.MailRelay());
+        services.TryAddSingleton<MatIdentity.Core.Mail.IMailTransport, MatIdentity.Core.Mail.SmtpMailTransport>();
+        services.AddSingleton<MatIdentity.Core.Mail.MailService>();
+        services.AddSingleton<MatIdentity.Core.Mail.MailQueue>();
+        services.AddHostedService<MatIdentity.Core.Mail.MailQueueWorker>();
 
         // Per-request services (depend on the scoped DbContext and on the OpenIddict managers).
         services.AddScoped<AuthService>();

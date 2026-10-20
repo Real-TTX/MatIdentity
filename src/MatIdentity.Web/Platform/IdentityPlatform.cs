@@ -6,6 +6,7 @@ using MatIdentity.Core.Clients;
 using MatIdentity.Core.Configuration;
 using MatIdentity.Core.Data;
 using MatIdentity.Core.Entities;
+using MatIdentity.Core.Mail;
 using MatIdentity.Core.Users;
 using MatIdentity.Web.Support;
 
@@ -28,9 +29,11 @@ public sealed class IdentityPlatform : IMatPlatformApp
     private readonly SystemConfigService _config;
     private readonly ApiAccess _access;
     private readonly TokenRevoker _revoker;
+    private readonly MailService _mail;
 
-    public IdentityPlatform(DatabaseService database, UserService users, ClientService clients, SessionService sessions, ActivityService activity, SystemConfigService config, ApiAccess access, TokenRevoker revoker)
+    public IdentityPlatform(DatabaseService database, UserService users, ClientService clients, SessionService sessions, ActivityService activity, SystemConfigService config, ApiAccess access, TokenRevoker revoker, MailService mail)
     {
+        _mail = mail;
         _revoker = revoker;
         _database = database;
         _users = users;
@@ -57,6 +60,7 @@ public sealed class IdentityPlatform : IMatPlatformApp
             [
                 new MatSection("form", ["instanceName", "issuer"], Label: "General"),
                 new MatSection("form", ["sessionLifetimeDays", "accessTokenMinutes"], Label: "Sign-in"),
+                new MatSection("form", MailKeys, Label: "Mail"),
             ]),
         ],
         State =
@@ -87,6 +91,7 @@ public sealed class IdentityPlatform : IMatPlatformApp
                 Required = true, Min = SystemConfigService.MinTokenMinutes, Max = SystemConfigService.MaxTokenMinutes,
                 Hint = "Short is safer; the apps renew it on their own.", Restart = true,
             },
+            .. MailFields(),
         ],
         Actions =
         [
@@ -101,6 +106,23 @@ public sealed class IdentityPlatform : IMatPlatformApp
         Provides = [new MatCapability("identity.oidc", 1)],
         Endpoints = ["/api/health", "/api/state", "/api/configure", "/api/actions", "/api/v1/clients"],
     };
+
+    /// <summary>The settings of the own SMTP server; fixed when MatSMTP is set.</summary>
+    private static readonly string[] MailKeys = ["smtpHost", "smtpPort", "smtpTls", "smtpFrom", "smtpUsername", "smtpPassword"];
+
+    private IEnumerable<MatField> MailFields()
+    {
+        MatField[] fields =
+        [
+            new MatField("smtpHost", "SMTP server", "text") { Placeholder = "smtp.example.com", Hint = "For password resets, invitations and confirming e-mail addresses. Empty: no mail." },
+            new MatField("smtpPort", "Port", "number") { Min = 1, Max = 65535 },
+            new MatField("smtpTls", "Security", "select") { Options = [new("starttls", "STARTTLS (587)"), new("tls", "TLS (465)"), new("none", "None")] },
+            new MatField("smtpFrom", "Sender", "email") { Placeholder = "id@example.com" },
+            new MatField("smtpUsername", "User", "text"),
+            new MatField("smtpPassword", "Password", "secret") { Hint = "Never sent back; empty keeps it." },
+        ];
+        return _mail.Relay.IsConfigured ? fields.Select(f => f with { Fixed = true, Hint = _mail.Relay.Description }) : fields;
+    }
 
     public async Task<MatHealth> HealthAsync(CancellationToken ct)
     {
@@ -141,6 +163,13 @@ public sealed class IdentityPlatform : IMatPlatformApp
             ["issuer"] = config.Issuer,
             ["sessionLifetimeDays"] = config.SessionLifetimeDays,
             ["accessTokenMinutes"] = config.AccessTokenMinutes,
+            ["smtpHost"] = _mail.Relay.Target?.Host ?? config.SmtpHost,
+            ["smtpPort"] = _mail.Relay.Target?.Port ?? config.SmtpPort,
+            ["smtpTls"] = _mail.Relay.Target is { } relay ? SmtpTarget.Name(relay.Tls) : config.SmtpTls,
+            ["smtpFrom"] = _mail.Relay.Target?.From ?? config.SmtpFrom,
+            ["smtpUsername"] = _mail.Relay.Target is { } fixedTarget ? fixedTarget.Username : config.SmtpUsername,
+            // A secret is never sent back.
+            ["smtpPassword"] = null,
         };
     }
 
@@ -150,8 +179,40 @@ public sealed class IdentityPlatform : IMatPlatformApp
         var errors = new Dictionary<string, string>();
         foreach (var (key, value) in values)
         {
+            if (_mail.Relay.IsConfigured && MailKeys.Contains(key))
+            {
+                errors[key] = "Mattiverse sets the mail (MatSMTP); it cannot be changed here.";
+                continue;
+            }
+
             switch (key)
             {
+                case "smtpHost" or "smtpFrom" or "smtpUsername" or "smtpTls" when value.ValueKind is JsonValueKind.String or JsonValueKind.Null:
+                    var text = value.ValueKind == JsonValueKind.Null ? null : value.GetString();
+                    _ = key switch
+                    {
+                        "smtpHost" => config.SmtpHost = text,
+                        "smtpFrom" => config.SmtpFrom = text,
+                        "smtpUsername" => config.SmtpUsername = text,
+                        _ => config.SmtpTls = text ?? "starttls",
+                    };
+                    break;
+                case "smtpPort" when value.TryGetInt32Strict(out var port):
+                    config.SmtpPort = port;
+                    break;
+                case "smtpPassword" when value.ValueKind is JsonValueKind.String or JsonValueKind.Null:
+                    if (!string.IsNullOrEmpty(value.GetString()))
+                    {
+                        config.SmtpPasswordProtected = _mail.ProtectPassword(value.GetString());
+                    }
+
+                    break;
+                case "smtpHost" or "smtpFrom" or "smtpUsername" or "smtpTls" or "smtpPassword":
+                    errors[key] = "Enter a text.";
+                    break;
+                case "smtpPort":
+                    errors[key] = "Enter a whole number.";
+                    break;
                 case "instanceName" when value.ValueKind == JsonValueKind.String:
                     config.InstanceName = value.GetString()!;
                     break;

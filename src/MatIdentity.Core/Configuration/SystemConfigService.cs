@@ -41,14 +41,45 @@ public sealed class SystemConfigService
             errors["accessTokenMinutes"] = $"Choose between {MinTokenMinutes} and {MaxTokenMinutes} minutes.";
         }
 
+        if (!string.IsNullOrWhiteSpace(config.SmtpHost))
+        {
+            if (config.SmtpHost.Trim().Length > 253 || config.SmtpHost.Any(char.IsWhiteSpace))
+            {
+                errors["smtpHost"] = "Enter the name or address of the server, like smtp.example.com.";
+            }
+
+            if (config.SmtpPort is < 1 or > 65535)
+            {
+                errors["smtpPort"] = "Choose a port between 1 and 65535.";
+            }
+
+            if (string.IsNullOrWhiteSpace(config.SmtpFrom) || !IsMailAddress(config.SmtpFrom))
+            {
+                errors["smtpFrom"] = "Enter the sender address, like id@example.com.";
+            }
+
+            if (Mail.SmtpTarget.Parse(config.SmtpTls) is null)
+            {
+                errors["smtpTls"] = "Choose none, starttls or tls.";
+            }
+        }
+
         return errors;
     }
+
+    /// <summary>A plain address (<c>name@host</c>), as MimeKit reads it.</summary>
+    public static bool IsMailAddress(string value)
+        => MimeKit.MailboxAddress.TryParse(value.Trim(), out var address) && address.Address.Contains('@') && string.IsNullOrEmpty(address.Name);
 
     /// <summary>Saves the values when they are valid; returns the errors otherwise (nothing is saved then).</summary>
     public async Task<Dictionary<string, string>> SaveAsync(SystemConfig config, CancellationToken ct = default)
     {
         config.InstanceName = config.InstanceName?.Trim() ?? string.Empty;
         config.Issuer = string.IsNullOrWhiteSpace(config.Issuer) ? null : config.Issuer.Trim().TrimEnd('/');
+        config.SmtpHost = string.IsNullOrWhiteSpace(config.SmtpHost) ? null : config.SmtpHost.Trim();
+        config.SmtpUsername = string.IsNullOrWhiteSpace(config.SmtpUsername) ? null : config.SmtpUsername.Trim();
+        config.SmtpFrom = string.IsNullOrWhiteSpace(config.SmtpFrom) ? null : config.SmtpFrom.Trim();
+        config.SmtpTls = config.SmtpTls?.Trim().ToLowerInvariant() ?? "starttls";
         var errors = Validate(config);
         if (errors.Count == 0)
         {

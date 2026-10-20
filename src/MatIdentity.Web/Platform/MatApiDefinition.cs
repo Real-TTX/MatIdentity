@@ -82,6 +82,9 @@ public sealed record MatField(string Key, string Label, string Type)
 
     /// <summary>The value takes effect after a restart.</summary>
     public bool? Restart { get; init; }
+
+    /// <summary>Set from outside (MatSMTP through Mattiverse): shown, not changeable; <c>PUT /api/configure</c> refuses it.</summary>
+    public bool? Fixed { get; init; }
 }
 
 public sealed record MatOption(string Value, string Label);

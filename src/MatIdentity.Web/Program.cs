@@ -69,6 +69,16 @@ builder.Services.AddSingleton<ApiAccess>();
 builder.Services.AddScoped<IMatPlatformApp, IdentityPlatform>();
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<AppRolesReader>();
+// Mail through MatSMTP when Mattiverse sets MATSMTP_* (MatDesign docs/PLATFORM.md); then the own SMTP settings are fixed.
+var matSmtp = MatPlatform.MatSmtpSettings.From(builder.Configuration);
+builder.Services.AddSingleton(new MatIdentity.Core.Mail.MailRelay
+{
+    Target = matSmtp.IsConfigured
+        ? new MatIdentity.Core.Mail.SmtpTarget(matSmtp.Host!, matSmtp.Port, matSmtp.Username, matSmtp.Password, matSmtp.FromAddress ?? "matidentity@localhost",
+            matSmtp.UseTls ? MatIdentity.Core.Mail.MailTls.Tls : matSmtp.UseStartTls ? MatIdentity.Core.Mail.MailTls.StartTls : MatIdentity.Core.Mail.MailTls.None, Fixed: true)
+        : null,
+    Description = matSmtp.Describe("en"),
+});
 builder.Services.AddMatIdentityCore();
 builder.Services.AddMatIdentityRateLimits(builder.Configuration);
 

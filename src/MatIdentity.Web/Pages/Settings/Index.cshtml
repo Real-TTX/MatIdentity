@@ -34,9 +34,58 @@
         </div>
     </div>
 
+    <div class="mat-card">
+        <div class="mat-card__head"><icon name="mail" /><span class="mat-card__title">Mail</span></div>
+        @if (Model.Relay.Target is { } relay)
+        {
+            <div class="mat-card__body mat-stack">
+                <p class="mat-muted">@Model.Relay.Description</p>
+                <dl class="mat-kv">
+                    <dt>Server</dt><dd class="mat-mono">@relay.Host:@relay.Port</dd>
+                    <dt>Security</dt><dd>@MatIdentity.Core.Mail.SmtpTarget.Name(relay.Tls)</dd>
+                    <dt>User</dt><dd class="mat-mono">@(relay.Username ?? "–")</dd>
+                    <dt>Sender</dt><dd class="mat-mono">@relay.From</dd>
+                </dl>
+            </div>
+        }
+        else
+        {
+            <div class="mat-card__body mat-form__grid">
+                <p class="mat-muted mat-field--full">For password resets, invitations and confirming e-mail addresses. Without a server these are hidden.</p>
+                <mat-field label="SMTP server" asp-for="Input.SmtpHost" hint="Empty: no mail.">
+                    <input asp-for="Input.SmtpHost" class="mat-input" placeholder="smtp.example.com" autocomplete="off" />
+                </mat-field>
+                <mat-field label="Port" asp-for="Input.SmtpPort">
+                    <input asp-for="Input.SmtpPort" type="number" class="mat-input" min="1" max="65535" data-msg-range="Choose a port between 1 and 65535." />
+                </mat-field>
+                <mat-field label="Security" asp-for="Input.SmtpTls">
+                    <select asp-for="Input.SmtpTls" class="mat-select">
+                        <option value="starttls">STARTTLS (587)</option>
+                        <option value="tls">TLS (465)</option>
+                        <option value="none">None</option>
+                    </select>
+                </mat-field>
+                <mat-field label="Sender" asp-for="Input.SmtpFrom">
+                    <input asp-for="Input.SmtpFrom" type="email" class="mat-input" placeholder="id@example.com" data-msg-type="Enter an address like id@example.com." />
+                </mat-field>
+                <mat-field label="User" asp-for="Input.SmtpUsername" hint="Empty: no sign-in at the server.">
+                    <input asp-for="Input.SmtpUsername" class="mat-input" autocomplete="off" />
+                </mat-field>
+                <mat-field label="Password" asp-for="Input.SmtpPassword" hint="@(Model.HasSmtpPassword ? "Stored. Empty keeps it." : null)">
+                    <input asp-for="Input.SmtpPassword" type="password" class="mat-input" autocomplete="new-password" />
+                </mat-field>
+            </div>
+        }
+    </div>
+
     <div class="mat-btn-row">
         <button type="submit" class="mat-btn mat-btn--primary"><icon name="save" /><span>Save</span></button>
         <a href="/" class="mat-btn mat-btn--secondary"><icon name="back" /><span>Back</span></a>
+        @if (Model.MailAvailable)
+        {
+            <span class="mat-btn-row__spacer"></span>
+            <button type="submit" class="mat-btn mat-btn--secondary mat-btn--end" asp-page-handler="TestMail" formnovalidate><icon name="mail" /><span>Send a test mail</span></button>
+        }
     </div>
 </form>
 
