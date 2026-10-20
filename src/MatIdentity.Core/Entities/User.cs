@@ -29,6 +29,12 @@ public class User : AuditableEntity
     /// <summary>Forces a password change on next login (e.g. for a seeded admin).</summary>
     public bool MustChangePassword { get; set; }
 
+    /// <summary>Wrong passwords or codes in a row (the count starts again after a sign-in).</summary>
+    public int FailedSignIns { get; set; }
+
+    /// <summary>Until then the password does not sign the account in (too many wrong attempts in a row).</summary>
+    public DateTime? LockedUntil { get; set; }
+
     public DateTime? LastLoginAt { get; set; }
 
     /// <summary>Preferred theme: system, light or dark (stored in the browser as well, so it applies before login).</summary>

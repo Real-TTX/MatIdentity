@@ -8,6 +8,18 @@
     var pwHint = Model.IsEdit ? "Leave blank to keep the current password. A new one signs the person out everywhere." : "At least 8 characters.";
 }
 
+@if (Model.LockedUntil is { } locked)
+{
+    <div class="mat-alert mat-alert--warning" role="status">
+        <icon name="lock" />
+        <div class="mat-alert__body">Locked until @Format.DateTimeLocal(locked): too many wrong passwords or codes in a row. A passkey still signs the person in.</div>
+        <form method="post" asp-page-handler="Unlock">
+            <input type="hidden" name="id" value="@Model.Input.Id" />
+            <button type="submit" class="mat-btn mat-btn--secondary mat-btn--sm"><icon name="lock" /><span>Unlock</span></button>
+        </form>
+    </div>
+}
+
 <form method="post" class="mat-form" novalidate>
     <input type="hidden" asp-for="Input.Id" />
     <partial name="_ValidationSummary" />

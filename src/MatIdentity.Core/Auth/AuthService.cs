@@ -14,12 +14,19 @@ public sealed class AuthService
         "pbkdf2$sha256$210000$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
 
     private readonly MatIdentityDbContext _db;
-    private readonly IPasswordHasher _passwordHasher;
+    /// <summary>Wrong passwords or codes in a row before the password sign-in of an account is locked.</summary>
+    public const int MaxFailedAttempts = 10;
 
-    public AuthService(MatIdentityDbContext db, IPasswordHasher passwordHasher)
+    public static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(15);
+
+    private readonly IPasswordHasher _passwordHasher;
+    private readonly TimeProvider _time;
+
+    public AuthService(MatIdentityDbContext db, IPasswordHasher passwordHasher, TimeProvider time)
     {
         _db = db;
         _passwordHasher = passwordHasher;
+        _time = time;
     }
 
     public async Task<AuthenticationResult> AuthenticateAsync(string username, string password, CancellationToken ct = default)
@@ -32,9 +39,15 @@ public sealed class AuthService
         // Always verify (against a dummy hash when the user is unknown) to equalize timing.
         var passwordValid = _passwordHasher.Verify(password, user?.PasswordHash ?? DummyHash);
 
+        // Locked after too many wrong attempts: the same answer as a wrong password (a right one must not show through), for a quarter of an hour.
+        if (user?.LockedUntil > _time.GetUtcNow().UtcDateTime)
+        {
+            return AuthenticationResult.Failure(invalidCredentials, wasLocked: true);
+        }
+
         if (user is null || !passwordValid)
         {
-            return AuthenticationResult.Failure(invalidCredentials);
+            return AuthenticationResult.Failure(invalidCredentials, lockedNow: user is not null && await RegisterFailureAsync(user, ct));
         }
 
         // The "deactivated" hint is only shown once the password is correct, so it cannot be used to
@@ -48,6 +61,35 @@ public sealed class AuthService
         await _db.SaveChangesAsync(ct);
 
         return AuthenticationResult.Success(user);
+    }
+
+    /// <summary>
+    /// Counts a wrong password or a wrong code of the second step; the <see cref="MaxFailedAttempts"/>th in a row locks the password sign-in of the account for
+    /// <see cref="LockoutDuration"/> (a passkey alone still works: it is two factors itself). True when this attempt locked it.
+    /// </summary>
+    public async Task<bool> RegisterFailureAsync(User user, CancellationToken ct = default)
+    {
+        user.FailedSignIns++;
+        var locked = user.FailedSignIns >= MaxFailedAttempts;
+        if (locked)
+        {
+            user.LockedUntil = _time.GetUtcNow().UtcDateTime.Add(LockoutDuration);
+            user.FailedSignIns = 0;
+        }
+
+        await _db.SaveChangesAsync(ct);
+        return locked;
+    }
+
+    /// <summary>A sign-in succeeded, an administrator unlocked the account or a password was set by link: the count starts again.</summary>
+    public async Task ClearFailuresAsync(long userId, CancellationToken ct = default)
+    {
+        if (await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct) is { } user && (user.FailedSignIns != 0 || user.LockedUntil is not null))
+        {
+            user.FailedSignIns = 0;
+            user.LockedUntil = null;
+            await _db.SaveChangesAsync(ct);
+        }
     }
 
     /// <summary>

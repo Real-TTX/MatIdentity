@@ -85,6 +85,8 @@ public sealed class UserService
         {
             user.PasswordHash = _passwordHasher.Hash(newPassword);
             user.MustChangePassword = false;
+            user.FailedSignIns = 0;
+            user.LockedUntil = null;
         }
 
         await _db.SaveChangesAsync(ct);
@@ -115,6 +117,8 @@ public sealed class UserService
 
         user.PasswordHash = _passwordHasher.Hash(newPassword);
         user.MustChangePassword = false;
+        user.FailedSignIns = 0;
+        user.LockedUntil = null;
         await _db.SaveChangesAsync(ct);
         return true;
     }

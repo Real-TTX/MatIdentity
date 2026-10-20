@@ -103,7 +103,13 @@ public class LoginModel : PageModel
         var result = await _authService.AuthenticateAsync(Input.Username, Input.Password, HttpContext.RequestAborted);
         if (!result.Succeeded || result.User is null)
         {
-            await _activity.WriteAsync(ActivityKind.SignInFailed, username: Input.Username, ipAddress: ip, detail: result.Error, ct: HttpContext.RequestAborted);
+            await _activity.WriteAsync(ActivityKind.SignInFailed, username: Input.Username, ipAddress: ip, detail: result.WasLocked ? "The account is locked" : result.Error, ct: HttpContext.RequestAborted);
+            if (result.LockedNow)
+            {
+                await _activity.WriteAsync(ActivityKind.AccountLocked, username: Input.Username, ipAddress: ip,
+                    detail: $"{AuthService.MaxFailedAttempts} wrong attempts in a row: locked for {(int)AuthService.LockoutDuration.TotalMinutes} minutes", ct: HttpContext.RequestAborted);
+            }
+
             ErrorMessage = result.Error ?? "Sign-in failed.";
             return Page();
         }

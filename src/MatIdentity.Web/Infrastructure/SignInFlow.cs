@@ -39,6 +39,7 @@ public static class SignInFlow
         await http.SignInAsync(AuthConstants.CookieScheme, PrincipalFactory.Build(user, session.Token), new AuthenticationProperties { IsPersistent = remember });
         await http.SignOutAsync(TwoFactorScheme);
         services.GetRequiredService<IMemoryCache>().Remove(AttemptsKey(user.Id));
+        await services.GetRequiredService<AuthService>().ClearFailuresAsync(user.Id, http.RequestAborted);
         await services.GetRequiredService<ActivityService>().WriteAsync(ActivityKind.SignIn, user, ipAddress: ip, detail: how, ct: http.RequestAborted);
     }
 

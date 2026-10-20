@@ -64,6 +64,9 @@ public class EditModel : PageModel
 
     public bool EmailVerified { get; private set; }
 
+    /// <summary>Too many wrong attempts: until then the password does not sign the person in.</summary>
+    public DateTime? LockedUntil { get; private set; }
+
     [TempData] public string? StatusMessage { get; set; }
     [TempData] public bool IsError { get; set; }
 
@@ -132,12 +135,29 @@ public class EditModel : PageModel
             UsesAuthenticator = user.TotpEnabled;
             PasskeyCount = (await _passkeys.ListAsync(user.Id, HttpContext.RequestAborted)).Count;
             EmailVerified = user.EmailVerified;
+            LockedUntil = user.LockedUntil > DateTime.UtcNow ? user.LockedUntil : null;
             InvitationOpen = (await _accounts.OpenInvitationsAsync(HttpContext.RequestAborted)).Contains(user.Id);
         }
 
         MailAvailable = await _mail.IsAvailableAsync(HttpContext.RequestAborted);
         Input.Invite = MailAvailable;
         return Page();
+    }
+
+    /// <summary>Ends a lock after too many wrong attempts (the person called and it was them).</summary>
+    public async Task<IActionResult> OnPostUnlockAsync(long id, [FromServices] AuthService auth)
+    {
+        if (await _userService.GetAsync(id, HttpContext.RequestAborted) is not { } user)
+        {
+            return NotFound();
+        }
+
+        await auth.ClearFailuresAsync(user.Id, HttpContext.RequestAborted);
+        await _activity.WriteAsync(ActivityKind.PersonChanged, username: User.GetUsername(), ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString(),
+            detail: user.Username + ": unlocked", ct: HttpContext.RequestAborted);
+        StatusMessage = $"{user.DisplayName} can sign in again.";
+        IsError = false;
+        return RedirectToPage(new { id });
     }
 
     /// <summary>The invitation again (a new link; the old one stops working).</summary>

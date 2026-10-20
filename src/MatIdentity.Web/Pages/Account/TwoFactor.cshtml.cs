@@ -3,6 +3,7 @@ using MatIdentity.Core.Activity;
 using MatIdentity.Core.Auth;
 using MatIdentity.Core.Entities;
 using MatIdentity.Core.Users;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -22,9 +23,11 @@ public class TwoFactorModel : PageModel
     private readonly UserService _users;
     private readonly ActivityService _activity;
     private readonly PasskeyService _passkeys;
+    private readonly AuthService _auth;
 
-    public TwoFactorModel(TwoFactorService twoFactor, UserService users, ActivityService activity, PasskeyService passkeys)
+    public TwoFactorModel(TwoFactorService twoFactor, UserService users, ActivityService activity, PasskeyService passkeys, AuthService auth)
     {
+        _auth = auth;
         _twoFactor = twoFactor;
         _users = users;
         _activity = activity;
@@ -61,7 +64,7 @@ public class TwoFactorModel : PageModel
     {
         var pending = await SignInFlow.PendingAsync(HttpContext);
         var user = await LoadAsync();
-        if (pending is null || user is null)
+        if (pending is null || user is null || user.LockedUntil > DateTime.UtcNow)
         {
             return RedirectToPage("/Account/Login", new { returnUrl = ReturnUrl });
         }
@@ -75,6 +78,15 @@ public class TwoFactorModel : PageModel
         if (!ok)
         {
             await _activity.WriteAsync(ActivityKind.SignInFailed, user, ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString(), detail: "Wrong code", ct: HttpContext.RequestAborted);
+            // Wrong codes count like wrong passwords: ten in a row lock the account (the five-try limit alone could be restarted with the password).
+            if (await _auth.RegisterFailureAsync(user, HttpContext.RequestAborted))
+            {
+                await _activity.WriteAsync(ActivityKind.AccountLocked, user, ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString(),
+                    detail: $"{AuthService.MaxFailedAttempts} wrong attempts in a row: locked for {(int)AuthService.LockoutDuration.TotalMinutes} minutes", ct: HttpContext.RequestAborted);
+                await HttpContext.SignOutAsync(SignInFlow.TwoFactorScheme);
+                return RedirectToPage("/Account/Login", new { returnUrl = ReturnUrl });
+            }
+
             if (await SignInFlow.FailedAttemptAsync(HttpContext, user.Id))
             {
                 return RedirectToPage("/Account/Login", new { returnUrl = ReturnUrl });

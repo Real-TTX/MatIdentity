@@ -459,10 +459,16 @@ namespace MatIdentity.Core.Data.Migrations
                     b.Property<bool>("EmailVerified")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int>("FailedSignIns")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("LastLoginAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("LockedUntil")
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("MustChangePassword")
