@@ -37,5 +37,17 @@ public enum ActivityKind
     ClientSecretRenewed = 8,
 
     /// <summary>A person tried to sign in to an app that was not given to them.</summary>
-    AccessDenied = 9
+    AccessDenied = 9,
+
+    /// <summary>A link to set a new password was sent ("Forgot your password?").</summary>
+    PasswordResetSent = 10,
+
+    /// <summary>A person set their password with a link (a reset or an invitation).</summary>
+    PasswordSetByLink = 11,
+
+    /// <summary>An administrator sent an invitation.</summary>
+    InvitationSent = 12,
+
+    /// <summary>A person confirmed their e-mail address.</summary>
+    EmailVerified = 13
 }

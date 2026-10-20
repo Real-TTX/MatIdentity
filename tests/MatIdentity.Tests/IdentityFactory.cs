@@ -28,7 +28,8 @@ public sealed class IdentityFactory : WebApplicationFactory<Program>
         Environment.SetEnvironmentVariable("MatIdentity__RateLimits__SignIn", "10000");
         // A replayed refresh token is caught at once (the default leeway is for apps that renew twice in parallel).
         Environment.SetEnvironmentVariable("MatIdentity__RefreshTokenReuseLeewaySeconds", "0");
-        // Mail through MatSMTP (as Mattiverse sets it); the transport is replaced, nothing leaves the test.
+        // A public address (links in mails need one) and mail through MatSMTP (as Mattiverse sets it); the transport is replaced, nothing leaves the test.
+        Environment.SetEnvironmentVariable("MatIdentity__Issuer", "http://localhost");
         Environment.SetEnvironmentVariable("MATSMTP_HOST", "matsmtp.test");
         Environment.SetEnvironmentVariable("MATSMTP_PORT", "2025");
         Environment.SetEnvironmentVariable("MATSMTP_USERNAME", "matidentity");

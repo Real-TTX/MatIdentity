@@ -34,6 +34,7 @@ public class MatIdentityDbContext : DbContext
     public DbSet<AppRole> AppRoles => Set<AppRole>();
     public DbSet<AppGrant> AppGrants => Set<AppGrant>();
     public DbSet<AppCallGrant> AppCallGrants => Set<AppCallGrant>();
+    public DbSet<AccountToken> AccountTokens => Set<AccountToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -163,6 +164,19 @@ public class MatIdentityDbContext : DbContext
             e.Property(x => x.CallerClientId).HasMaxLength(100).IsRequired();
             e.Property(x => x.TargetClientId).HasMaxLength(100).IsRequired();
             e.HasIndex(x => new { x.CallerClientId, x.TargetClientId }).IsUnique().HasFilter("\"UpdateState\" <> 0");
+            e.HasQueryFilter(x => x.UpdateState != UpdateState.Deleted);
+        });
+
+        modelBuilder.Entity<AccountToken>(e =>
+        {
+            e.ToTable("AccountToken");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Purpose).HasConversion<int>();
+            e.Property(x => x.TokenHash).HasMaxLength(64).IsRequired();
+            e.Property(x => x.Email).HasMaxLength(256);
+            e.HasIndex(x => x.TokenHash).IsUnique();
+            e.HasIndex(x => new { x.UserId, x.Purpose });
+            e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
             e.HasQueryFilter(x => x.UpdateState != UpdateState.Deleted);
         });
 

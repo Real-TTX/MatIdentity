@@ -38,6 +38,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<MatIdentity.Core.Data.DatabaseService>();
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<UserService>();
+        services.AddScoped<AccountTokenService>();
+        services.AddScoped<AccountMailService>();
         services.AddScoped<ActivityService>();
         services.AddScoped<ClientService>();
         services.AddScoped<TokenRevoker>();

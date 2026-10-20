@@ -153,7 +153,7 @@ public static class OidcEndpoints
         if (result.Principal.HasScope(Scopes.Email) && !string.IsNullOrEmpty(user.Email))
         {
             claims[Claims.Email] = user.Email;
-            claims[Claims.EmailVerified] = false;
+            claims[Claims.EmailVerified] = user.EmailVerified;
         }
 
         if (result.Principal.HasScope(Scopes.Roles))
@@ -210,6 +210,12 @@ public static class OidcEndpoints
             .SetClaim(Claims.Name, user.DisplayName)
             .SetClaim(Claims.PreferredUsername, user.Username)
             .SetClaim(Claims.Email, user.Email);
+        if (!string.IsNullOrEmpty(user.Email))
+        {
+            // True once the person followed a link sent to the address (a confirmation, an invitation or a password reset).
+            identity.AddClaim(new Claim(Claims.EmailVerified, user.EmailVerified ? "true" : "false", ClaimValueTypes.Boolean));
+        }
+
         if (appRole is not null)
         {
             identity.SetClaims(Claims.Role, [appRole]);
@@ -235,7 +241,7 @@ public static class OidcEndpoints
                 yield return OpenIddictConstants.Destinations.IdentityToken;
                 yield break;
 
-            case Claims.Email when principal.HasScope(Scopes.Email):
+            case Claims.Email or Claims.EmailVerified when principal.HasScope(Scopes.Email):
                 yield return OpenIddictConstants.Destinations.IdentityToken;
                 yield break;
 

@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using MatIdentity.Core.Auth;
 using MatIdentity.Core.Clients;
+using MatIdentity.Core.Configuration;
 using MatIdentity.Core.Entities;
 using MatIdentity.Core.Security;
 using MatIdentity.Core.Users;
@@ -18,9 +19,17 @@ public class ProfileModel : PageModel
     private readonly SessionService _sessions;
     private readonly TokenRevoker _revoker;
     private readonly IPasswordHasher _passwordHasher;
+    private readonly AccountMailService _accounts;
+    private readonly MatIdentity.Core.Mail.MailService _mail;
+    private readonly SystemConfigService _config;
+    private readonly IConfiguration _configuration;
 
-    public ProfileModel(UserService userService, SessionService sessions, TokenRevoker revoker, IPasswordHasher passwordHasher)
+    public ProfileModel(UserService userService, SessionService sessions, TokenRevoker revoker, IPasswordHasher passwordHasher, AccountMailService accounts, MatIdentity.Core.Mail.MailService mail, SystemConfigService config, IConfiguration configuration)
     {
+        _accounts = accounts;
+        _mail = mail;
+        _config = config;
+        _configuration = configuration;
         _userService = userService;
         _sessions = sessions;
         _revoker = revoker;
@@ -40,6 +49,11 @@ public class ProfileModel : PageModel
     public string Username { get; private set; } = string.Empty;
     public string DisplayName { get; private set; } = string.Empty;
     public string? Email { get; private set; }
+
+    public bool EmailVerified { get; private set; }
+
+    /// <summary>A confirmation mail can be sent (an address that is not confirmed, and mail).</summary>
+    public bool CanVerify { get; private set; }
     public UserRole Role { get; private set; }
     public bool MustChange { get; private set; }
     public IReadOnlyList<UserSession> Sessions { get; private set; } = [];
@@ -134,6 +148,21 @@ public class ProfileModel : PageModel
         return RedirectToPage(new { tab = "sessions" });
     }
 
+    /// <summary>A link to the address of the account; following it confirms the address.</summary>
+    public async Task<IActionResult> OnPostSendVerificationAsync()
+    {
+        if (User.GetUserId() is not { } userId || await _userService.GetAsync(userId, HttpContext.RequestAborted) is not { } user)
+        {
+            return Forbid();
+        }
+
+        var linkBase = await Support.Authority.GetAsync(HttpContext, _config, _configuration);
+        StatusMessage = await _accounts.SendVerificationAsync(user, linkBase, HttpContext.RequestAborted)
+            ? $"A link is on its way to {user.Email}. It works for 48 hours."
+            : "No mail could be sent.";
+        return RedirectToPage();
+    }
+
     private async Task<bool> LoadAsync()
     {
         var userId = User.GetUserId();
@@ -151,6 +180,8 @@ public class ProfileModel : PageModel
         Username = user.Username;
         DisplayName = user.DisplayName;
         Email = user.Email;
+        EmailVerified = user.EmailVerified;
+        CanVerify = !string.IsNullOrEmpty(user.Email) && !user.EmailVerified && await _mail.IsAvailableAsync(HttpContext.RequestAborted);
         Role = user.Role;
         MustChange = user.MustChangePassword;
         Sessions = await _sessions.ListActiveAsync(user.Id, HttpContext.RequestAborted);

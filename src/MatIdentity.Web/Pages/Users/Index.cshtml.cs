@@ -22,8 +22,11 @@ public class IndexModel : PageModel
     private readonly PermissionService _permissions;
     private readonly PasskeyService _passkeys;
 
-    public IndexModel(UserService userService, SessionService sessions, TokenRevoker revoker, PermissionService permissions, PasskeyService passkeys)
+    private readonly AccountMailService _accounts;
+
+    public IndexModel(UserService userService, SessionService sessions, TokenRevoker revoker, PermissionService permissions, PasskeyService passkeys, AccountMailService accounts)
     {
+        _accounts = accounts;
         _passkeys = passkeys;
         _permissions = permissions;
         _userService = userService;
@@ -36,6 +39,9 @@ public class IndexModel : PageModel
     /// <summary>How many passkeys each person has (the column "Second step").</summary>
     public IReadOnlyDictionary<long, int> PasskeyCounts { get; private set; } = new Dictionary<long, int>();
 
+    /// <summary>The people whose invitation is still open.</summary>
+    public IReadOnlySet<long> Invited { get; private set; } = new HashSet<long>();
+
     [TempData] public string? StatusMessage { get; set; }
     [TempData] public bool IsError { get; set; }
 
@@ -43,6 +49,7 @@ public class IndexModel : PageModel
     {
         var all = await _userService.GetAllAsync(HttpContext.RequestAborted);
         PasskeyCounts = await _passkeys.CountsAsync(HttpContext.RequestAborted);
+        Invited = await _accounts.OpenInvitationsAsync(HttpContext.RequestAborted);
         var q = ListQuery.Text(Request, "q");
         var role = ListQuery.Text(Request, "role");
         var sort = ListQuery.Text(Request, "sort") is { } s && SortKeys.Contains(s) ? s : "username";

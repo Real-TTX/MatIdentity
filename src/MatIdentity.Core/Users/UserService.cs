@@ -70,7 +70,14 @@ public sealed class UserService
         }
 
         user.DisplayName = string.IsNullOrWhiteSpace(displayName) ? user.Username : displayName.Trim();
-        user.Email = NormalizeEmail(email);
+        var newEmail = NormalizeEmail(email);
+        if (!string.Equals(user.Email, newEmail, StringComparison.OrdinalIgnoreCase))
+        {
+            // A new address is unconfirmed until its owner follows a link to it.
+            user.EmailVerified = false;
+        }
+
+        user.Email = newEmail;
         user.Role = role;
         user.IsActive = isActive;
 
@@ -110,6 +117,16 @@ public sealed class UserService
         user.MustChangePassword = false;
         await _db.SaveChangesAsync(ct);
         return true;
+    }
+
+    /// <summary>The person proved the address (a link in a mail to it).</summary>
+    public async Task SetEmailVerifiedAsync(long id, CancellationToken ct = default)
+    {
+        if (await _db.Users.FirstOrDefaultAsync(u => u.Id == id, ct) is { } user)
+        {
+            user.EmailVerified = true;
+            await _db.SaveChangesAsync(ct);
+        }
     }
 
     /// <summary>Stores the preferred theme (<c>system</c>, <c>light</c> or <c>dark</c>) of a user. Returns the user, or <c>null</c> if it does not exist.</summary>

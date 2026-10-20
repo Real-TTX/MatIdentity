@@ -1,0 +1,23 @@
+@page
+@model MatIdentity.Web.Pages.Account.VerifyModel
+@{
+    Layout = "_Bare";
+    ViewData["Title"] = "E-mail address";
+}
+
+<div class="mat-auth__card">
+    <div class="mat-auth__brand">
+        @Ui.Logo("lg")
+        @if (Model.Email is not null)
+        {
+            <h1>Address confirmed</h1>
+            <p class="mat-muted">@Model.Email is confirmed. Thank you.</p>
+        }
+        else
+        {
+            <h1>This link does not work</h1>
+            <p class="mat-muted">It was used already, it is too old, or the address has changed since. Ask for a new one on your account page.</p>
+        }
+    </div>
+    <a class="mat-btn mat-btn--primary mat-btn--block" href="/"><icon name="home" /><span>Your apps</span></a>
+</div>

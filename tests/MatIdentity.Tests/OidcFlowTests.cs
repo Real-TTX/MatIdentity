@@ -68,6 +68,8 @@ public sealed class OidcFlowTests
         Assert.Equal(DevAccount.Username, identity.GetProperty("preferred_username").GetString());
         Assert.Equal("admin", identity.GetProperty("role").GetString());
         Assert.Equal(DevAccount.Username, identity.GetProperty("email").GetString());
+        // Nobody confirmed the address of the development account (yet).
+        Assert.False(identity.GetProperty("email_verified").GetBoolean());
 
         // The user info answers the access token.
         var api = _site.CreateClient();

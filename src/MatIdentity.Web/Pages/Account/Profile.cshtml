@@ -18,14 +18,27 @@
 {
     <div class="mat-card">
         <div class="mat-card__head"><icon name="user" /><span class="mat-card__title">Your account</span></div>
-        <div class="mat-card__body">
+        <div class="mat-card__body mat-stack">
             <dl class="mat-kv">
                 <dt>Username</dt><dd>@Model.Username</dd>
                 <dt>Display name</dt><dd>@Model.DisplayName</dd>
-                <dt>E-mail</dt><dd>@(Model.Email ?? "–")</dd>
+                <dt>E-mail</dt>
+                <dd>
+                    @(Model.Email ?? "–")
+                    @if (Model.Email is not null)
+                    {
+                        <span class="mat-pill @(Model.EmailVerified ? "mat-pill--ok" : string.Empty)">@(Model.EmailVerified ? "Confirmed" : "Not confirmed")</span>
+                    }
+                </dd>
                 <dt>Role</dt><dd>@Model.Role</dd>
             </dl>
             <p class="mat-hint">The apps see your display name, your e-mail and your role. An administrator changes them.</p>
+            @if (Model.CanVerify)
+            {
+                <form method="post" asp-page-handler="SendVerification">
+                    <button type="submit" class="mat-btn mat-btn--secondary"><icon name="mail" /><span>Confirm the address</span></button>
+                </form>
+            }
         </div>
     </div>
 }

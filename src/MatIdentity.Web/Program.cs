@@ -202,6 +202,9 @@ builder.Services.AddRazorPages(options =>
     options.Conventions.AllowAnonymousToPage("/Setup");
     options.Conventions.AllowAnonymousToPage("/Account/Login");
     options.Conventions.AllowAnonymousToPage("/Account/TwoFactor");
+    options.Conventions.AllowAnonymousToPage("/Account/Forgot");
+    options.Conventions.AllowAnonymousToPage("/Account/Reset");
+    options.Conventions.AllowAnonymousToPage("/Account/Verify");
     options.Conventions.AllowAnonymousToPage("/Account/Logout");
     options.Conventions.AllowAnonymousToPage("/Account/AccessDenied");
     options.Conventions.AllowAnonymousToPage("/Error");

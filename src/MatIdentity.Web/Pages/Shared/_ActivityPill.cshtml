@@ -6,9 +6,9 @@
     var tone = Model switch
     {
         ActivityKind.SignInFailed => "mat-pill--error",
-        ActivityKind.SignIn or ActivityKind.AppSignIn => "mat-pill--ok",
+        ActivityKind.SignIn or ActivityKind.AppSignIn or ActivityKind.EmailVerified or ActivityKind.PasswordSetByLink => "mat-pill--ok",
         ActivityKind.ClientDeleted or ActivityKind.ClientSecretRenewed => "mat-pill--warn",
-        ActivityKind.ClientCreated or ActivityKind.ClientChanged or ActivityKind.MachineToken => "mat-pill--info",
+        ActivityKind.ClientCreated or ActivityKind.ClientChanged or ActivityKind.MachineToken or ActivityKind.InvitationSent or ActivityKind.PasswordResetSent => "mat-pill--info",
         _ => string.Empty,
     };
 }

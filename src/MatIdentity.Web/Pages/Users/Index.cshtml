@@ -37,7 +37,11 @@
                             <td data-label="E-mail" class="mat-hide-sm">@(u.Email ?? "–")</td>
                             <td data-label="Role">@u.Role</td>
                             <td data-label="Status">
-                                @if (u.IsActive)
+                                @if (u.IsActive && Model.Invited.Contains(u.Id))
+                                {
+                                    <span class="mat-pill mat-pill--info">Invited</span>
+                                }
+                                else if (u.IsActive)
                                 {
                                     <span class="mat-pill mat-pill--ok">Active</span>
                                 }

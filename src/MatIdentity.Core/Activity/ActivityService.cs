@@ -62,6 +62,10 @@ public sealed class ActivityService
         ActivityKind.ClientDeleted => "App removed",
         ActivityKind.ClientSecretRenewed => "App secret renewed",
         ActivityKind.AccessDenied => "No access to the app",
+        ActivityKind.PasswordResetSent => "Password link sent",
+        ActivityKind.PasswordSetByLink => "Password set by link",
+        ActivityKind.InvitationSent => "Invitation sent",
+        ActivityKind.EmailVerified => "E-mail confirmed",
         _ => kind.ToString(),
     };
 

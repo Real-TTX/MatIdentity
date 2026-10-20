@@ -24,9 +24,13 @@ public class LoginModel : PageModel
     private readonly ActivityService _activity;
     private readonly SystemConfigService _config;
     private readonly TwoFactorService _twoFactor;
+    private readonly MatIdentity.Core.Mail.MailService _mail;
+    private readonly IConfiguration _configuration;
 
-    public LoginModel(AuthService authService, SessionService sessionService, ActivityService activity, SystemConfigService config, TwoFactorService twoFactor)
+    public LoginModel(AuthService authService, SessionService sessionService, ActivityService activity, SystemConfigService config, TwoFactorService twoFactor, MatIdentity.Core.Mail.MailService mail, IConfiguration configuration)
     {
+        _mail = mail;
+        _configuration = configuration;
         _twoFactor = twoFactor;
         _authService = authService;
         _sessionService = sessionService;
@@ -46,6 +50,13 @@ public class LoginModel : PageModel
 
     [BindProperty(SupportsGet = true)]
     public bool SignedOut { get; set; }
+
+    /// <summary>Back from a link that set the password.</summary>
+    [BindProperty(SupportsGet = true)]
+    public bool PasswordSet { get; set; }
+
+    /// <summary>"Forgot your password?" is offered (mail and a public address).</summary>
+    public bool CanReset { get; private set; }
 
     public string? ErrorMessage { get; private set; }
 
@@ -110,7 +121,11 @@ public class LoginModel : PageModel
         return LocalRedirect(SafeReturnUrl());
     }
 
-    private async Task LoadAsync() => InstanceName = (await _config.GetAsync(HttpContext.RequestAborted)).InstanceName;
+    private async Task LoadAsync()
+    {
+        InstanceName = (await _config.GetAsync(HttpContext.RequestAborted)).InstanceName;
+        CanReset = await ForgotModel.LinkBaseAsync(HttpContext, _mail, _config, _configuration) is not null;
+    }
 
     private string SafeReturnUrl()
         => !string.IsNullOrEmpty(ReturnUrl) && Url.IsLocalUrl(ReturnUrl) ? ReturnUrl : "/";

@@ -17,6 +17,11 @@
         <div class="mat-alert mat-alert--success" role="status"><icon name="check-circle" /><div class="mat-alert__body">You are signed out.</div></div>
     }
 
+    @if (Model.PasswordSet)
+    {
+        <div class="mat-alert mat-alert--success" role="status"><icon name="check-circle" /><div class="mat-alert__body">Your password is set. Sign in with it.</div></div>
+    }
+
     @if (!string.IsNullOrEmpty(Model.ErrorMessage))
     {
         <div class="mat-alert mat-alert--danger" role="alert"><icon name="x-circle" /><div class="mat-alert__body">@Model.ErrorMessage</div></div>
@@ -48,4 +53,9 @@
             <button type="submit" class="mat-btn mat-btn--primary mat-btn--block"><icon name="login" /><span>Sign in</span></button>
         </div>
     </form>
+
+    @if (Model.CanReset)
+    {
+        <a class="mat-btn mat-btn--ghost mat-btn--block" href="/Account/Forgot@(string.IsNullOrEmpty(Model.ReturnUrl) ? string.Empty : "?returnUrl=" + Uri.EscapeDataString(Model.ReturnUrl))">Forgot your password?</a>
+    }
 </div>

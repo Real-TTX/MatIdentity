@@ -22,9 +22,18 @@ public class EditModel : PageModel
     private readonly TwoFactorService _twoFactor;
     private readonly PasskeyService _passkeys;
     private readonly MatIdentity.Core.Activity.ActivityService _activity;
+    private readonly AccountMailService _accounts;
+    private readonly MatIdentity.Core.Mail.MailService _mail;
+    private readonly MatIdentity.Core.Configuration.SystemConfigService _config;
+    private readonly IConfiguration _configuration;
 
-    public EditModel(UserService userService, SessionService sessions, TokenRevoker revoker, GroupService groups, TwoFactorService twoFactor, PasskeyService passkeys, MatIdentity.Core.Activity.ActivityService activity)
+    public EditModel(UserService userService, SessionService sessions, TokenRevoker revoker, GroupService groups, TwoFactorService twoFactor, PasskeyService passkeys, MatIdentity.Core.Activity.ActivityService activity,
+        AccountMailService accounts, MatIdentity.Core.Mail.MailService mail, MatIdentity.Core.Configuration.SystemConfigService config, IConfiguration configuration)
     {
+        _accounts = accounts;
+        _mail = mail;
+        _config = config;
+        _configuration = configuration;
         _twoFactor = twoFactor;
         _passkeys = passkeys;
         _activity = activity;
@@ -46,6 +55,14 @@ public class EditModel : PageModel
     public bool UsesAuthenticator { get; private set; }
 
     public int PasskeyCount { get; private set; }
+
+    /// <summary>Mail can be sent: invitations and password links.</summary>
+    public bool MailAvailable { get; private set; }
+
+    /// <summary>The person was invited and has not chosen a password yet.</summary>
+    public bool InvitationOpen { get; private set; }
+
+    public bool EmailVerified { get; private set; }
 
     [TempData] public string? StatusMessage { get; set; }
     [TempData] public bool IsError { get; set; }
@@ -86,6 +103,9 @@ public class EditModel : PageModel
         public string? ConfirmPassword { get; set; }
 
         public List<long> GroupIds { get; set; } = [];
+
+        /// <summary>A new person gets a mail and chooses the password (instead of one set here).</summary>
+        public bool Invite { get; set; } = true;
     }
 
     public async Task<IActionResult> OnGetAsync(long? id)
@@ -111,9 +131,63 @@ public class EditModel : PageModel
             };
             UsesAuthenticator = user.TotpEnabled;
             PasskeyCount = (await _passkeys.ListAsync(user.Id, HttpContext.RequestAborted)).Count;
+            EmailVerified = user.EmailVerified;
+            InvitationOpen = (await _accounts.OpenInvitationsAsync(HttpContext.RequestAborted)).Contains(user.Id);
         }
 
+        MailAvailable = await _mail.IsAvailableAsync(HttpContext.RequestAborted);
+        Input.Invite = MailAvailable;
         return Page();
+    }
+
+    /// <summary>The invitation again (a new link; the old one stops working).</summary>
+    public async Task<IActionResult> OnPostInviteAsync(long id)
+    {
+        if (await _userService.GetAsync(id, HttpContext.RequestAborted) is not { } user)
+        {
+            return NotFound();
+        }
+
+        await InviteAsync(user);
+        return RedirectToPage(new { id });
+    }
+
+    /// <summary>A link for a new password to the address of the person (they forgot it and asked an administrator).</summary>
+    public async Task<IActionResult> OnPostSendResetAsync(long id)
+    {
+        if (await _userService.GetAsync(id, HttpContext.RequestAborted) is not { Email: { Length: > 0 } } user)
+        {
+            return NotFound();
+        }
+
+        var linkBase = await Support.Authority.GetAsync(HttpContext, _config, _configuration);
+        var sent = await _accounts.RequestPasswordResetAsync(user.Username, linkBase, HttpContext.RequestAborted) is not null;
+        if (sent)
+        {
+            await _activity.WriteAsync(ActivityKind.PasswordResetSent, user, ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString(),
+                detail: "By " + User.GetUsername(), ct: HttpContext.RequestAborted);
+        }
+
+        StatusMessage = sent
+            ? $"A link for a new password is on its way to {user.Email}. It works for 30 minutes."
+            : $"No link was sent: the account is disabled, or it got {AccountMailService.MaxResetsPerHour} links in the last hour.";
+        IsError = !sent;
+        return RedirectToPage(new { id });
+    }
+
+    private async Task<bool> InviteAsync(User user)
+    {
+        var linkBase = await Support.Authority.GetAsync(HttpContext, _config, _configuration);
+        var error = await _accounts.InviteAsync(user, linkBase, User.GetDisplayName(), HttpContext.RequestAborted);
+        if (error is null)
+        {
+            await _activity.WriteAsync(ActivityKind.InvitationSent, user, ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString(),
+                detail: "By " + User.GetUsername(), ct: HttpContext.RequestAborted);
+        }
+
+        StatusMessage = error is null ? $"The invitation is on its way to {user.Email}." : "The invitation was not sent. " + error;
+        IsError = error is not null;
+        return error is null;
     }
 
     /// <summary>The phone is lost: turns the authenticator app off and removes the passkeys, so the password alone signs the person in again.</summary>
@@ -138,7 +212,14 @@ public class EditModel : PageModel
     {
         var ct = HttpContext.RequestAborted;
         AllGroups = (await _groups.GetAllAsync(ct)).Select(g => g.Group).ToList();
-        if (!IsEdit && string.IsNullOrEmpty(Input.Password))
+        MailAvailable = await _mail.IsAvailableAsync(ct);
+        var invite = !IsEdit && MailAvailable && Input.Invite;
+        if (invite && string.IsNullOrWhiteSpace(Input.Email))
+        {
+            ModelState.AddModelError("Input.Email", "The invitation goes to this address: please enter it.");
+        }
+
+        if (!IsEdit && !invite && string.IsNullOrEmpty(Input.Password))
         {
             ModelState.AddModelError("Input.Password", "Please set a password.");
         }
@@ -200,9 +281,17 @@ public class EditModel : PageModel
                 return Page();
             }
 
-            var created = await _userService.CreateAsync(Input.Username, displayName, Input.Email, Input.Password!, Input.Role, mustChangePassword: false, ct);
+            // Invited: a password nobody knows until the person chooses one with the link.
+            var password = invite ? AccountMailService.UnusablePassword() : Input.Password!;
+            var created = await _userService.CreateAsync(Input.Username, displayName, Input.Email, password, Input.Role, mustChangePassword: false, ct);
             await _groups.SetGroupsOfAsync(created.Id, Input.GroupIds, ct);
-            StatusMessage = "Person created.";
+            if (invite && !await InviteAsync(created))
+            {
+                // Created, but the mail failed: the person's page says so and offers to send it again.
+                return RedirectToPage(new { id = created.Id });
+            }
+
+            StatusMessage = invite ? $"Person created. The invitation is on its way to {created.Email}." : "Person created.";
         }
 
         IsError = false;

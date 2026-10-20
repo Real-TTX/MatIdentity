@@ -59,6 +59,19 @@
                     </fieldset>
                 }
 
+                @if (!Model.IsEdit && Model.MailAvailable)
+                {
+                    <div class="mat-field mat-field--full">
+                        <span class="mat-label">Password</span>
+                        <label class="mat-check">
+                            <input asp-for="Input.Invite" type="checkbox" />
+                            <span class="mat-check__text">Send an invitation: the person chooses the password</span>
+                        </label>
+                        <span class="mat-hint">The link goes to the e-mail address and works for 7 days.</span>
+                    </div>
+                }
+
+                <div class="mat-field--full mat-form__grid" data-show-if="@(!Model.IsEdit && Model.MailAvailable ? "#Input_Invite" : null)" data-show-value="false">
                 <mat-field label="Password" asp-for="Input.Password" required="@(!Model.IsEdit)" hint="@pwHint">
                     <input asp-for="Input.Password" type="password" class="mat-input" autocomplete="new-password" />
                 </mat-field>
@@ -66,6 +79,7 @@
                 <mat-field label="Confirm password" asp-for="Input.ConfirmPassword" required="@(!Model.IsEdit)">
                     <input asp-for="Input.ConfirmPassword" type="password" class="mat-input" autocomplete="new-password" />
                 </mat-field>
+                </div>
             </div>
         </div>
     </div>
@@ -75,6 +89,39 @@
         <a href="/Users" class="mat-btn mat-btn--secondary"><icon name="back" /><span>Back</span></a>
     </div>
 </form>
+
+@if (Model.IsEdit && Model.MailAvailable && !string.IsNullOrEmpty(Model.Input.Email))
+{
+    <div class="mat-card">
+        <div class="mat-card__head"><icon name="mail" /><span class="mat-card__title">Mail</span></div>
+        <div class="mat-card__body mat-stack">
+            <p>
+                @Model.Input.Email
+                <span class="mat-pill @(Model.EmailVerified ? "mat-pill--ok" : string.Empty)">@(Model.EmailVerified ? "Confirmed" : "Not confirmed")</span>
+                @if (Model.InvitationOpen)
+                {
+                    <span class="mat-pill mat-pill--info">Invited</span>
+                }
+            </p>
+            <div class="mat-btn-row mat-btn-row--plain">
+                @if (Model.InvitationOpen)
+                {
+                    <form method="post" asp-page-handler="Invite">
+                        <input type="hidden" name="id" value="@Model.Input.Id" />
+                        <button type="submit" class="mat-btn mat-btn--secondary"><icon name="mail" /><span>Send the invitation again</span></button>
+                    </form>
+                }
+                else
+                {
+                    <form method="post" asp-page-handler="SendReset">
+                        <input type="hidden" name="id" value="@Model.Input.Id" />
+                        <button type="submit" class="mat-btn mat-btn--secondary"><icon name="key" /><span>Send a link for a new password</span></button>
+                    </form>
+                }
+            </div>
+        </div>
+    </div>
+}
 
 @if (Model.IsEdit && (Model.UsesAuthenticator || Model.PasskeyCount > 0))
 {

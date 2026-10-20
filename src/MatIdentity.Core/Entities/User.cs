@@ -21,6 +21,9 @@ public class User : AuditableEntity
 
     public UserRole Role { get; set; } = UserRole.User;
 
+    /// <summary>The person proved the address (a link in a mail to it): the claim <c>email_verified</c>. A new address is unconfirmed again.</summary>
+    public bool EmailVerified { get; set; }
+
     public bool IsActive { get; set; } = true;
 
     /// <summary>Forces a password change on next login (e.g. for a seeded admin).</summary>

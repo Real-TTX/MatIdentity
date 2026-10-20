@@ -1,0 +1,45 @@
+@page
+@model MatIdentity.Web.Pages.Account.ResetModel
+@{
+    Layout = "_Bare";
+    ViewData["Title"] = Model.IsInvitation ? "Welcome" : "New password";
+}
+
+<div class="mat-auth__card">
+    <div class="mat-auth__brand">
+        @Ui.Logo("lg")
+        @if (Model.Link?.User is { } person)
+        {
+            <h1>@(Model.IsInvitation ? $"Welcome, {person.DisplayName}" : "Set a new password")</h1>
+            <p class="mat-muted">@(Model.IsInvitation ? $"Choose the password of your account {person.Username}." : $"For your account {person.Username}. Every other sign-in ends with it.")</p>
+        }
+        else
+        {
+            <h1>This link does not work</h1>
+            <p class="mat-muted">It was used already, it is too old, or a newer one replaced it.</p>
+        }
+    </div>
+
+    @if (Model.Link is not null)
+    {
+        <form method="post" class="mat-form" novalidate>
+            <input type="hidden" asp-for="Token" />
+            <partial name="_ValidationSummary" />
+            <mat-field label="Password" asp-for="Input.Password" required="true" hint="At least 8 characters.">
+                <input asp-for="Input.Password" type="password" class="mat-input" autocomplete="new-password" autofocus required minlength="8" data-msg-required="Please enter a password." data-msg-range="Use at least 8 characters." />
+            </mat-field>
+            <mat-field label="Confirm password" asp-for="Input.ConfirmPassword" required="true">
+                <input asp-for="Input.ConfirmPassword" type="password" class="mat-input" autocomplete="new-password" required data-msg-required="Please repeat the password." />
+            </mat-field>
+            <div class="mat-btn-row mat-btn-row--plain">
+                <button type="submit" class="mat-btn mat-btn--primary mat-btn--block"><icon name="save" /><span>Save the password</span></button>
+            </div>
+        </form>
+    }
+    else
+    {
+        <a class="mat-btn mat-btn--primary mat-btn--block" href="/Account/Forgot">Send a new link</a>
+    }
+
+    <a class="mat-btn mat-btn--ghost mat-btn--block" href="/Account/Login">Back to sign-in</a>
+</div>
