@@ -46,4 +46,26 @@ public sealed class AuditTests
         Assert.Contains(entries, e => e.Kind == ActivityKind.SettingsChanged && e.Detail == "Through the API: sessionLifetimeDays");
         Assert.DoesNotContain(entries, e => e.Detail?.Contains("Audit-Pass-1", StringComparison.Ordinal) == true);
     }
+
+    [Fact]
+    public async Task An_administrator_sees_where_a_person_is_signed_in_and_signs_them_out_everywhere()
+    {
+        long id;
+        using (var scope = _site.Services.CreateScope())
+        {
+            id = (await scope.ServiceProvider.GetRequiredService<MatIdentity.Core.Users.UserService>().CreateAsync("roaming", "Roaming", null, "Roam-Pass-1", UserRole.User)).Id;
+        }
+
+        var person = _site.Browser();
+        await IdentityFactory.SignInAsync(person, "/Account/Login", "roaming", "Roam-Pass-1");
+        Assert.Equal(HttpStatusCode.OK, (await person.GetAsync("/Account/Profile")).StatusCode);
+
+        var admin = await _site.AdminAsync();
+        Assert.DoesNotContain("Not signed in anywhere", await admin.GetStringAsync($"/Users/Edit?id={id}"));
+        var signedOut = await IdentityFactory.PostFormAsync(admin, $"/Users/Edit?id={id}", new() { ["id"] = id.ToString() }, $"/Users/Edit?id={id}&handler=SignOut");
+        Assert.Equal(HttpStatusCode.Redirect, signedOut.StatusCode);
+
+        Assert.Equal(HttpStatusCode.Redirect, (await person.GetAsync("/Account/Profile")).StatusCode);
+        Assert.Contains("Not signed in anywhere", await admin.GetStringAsync($"/Users/Edit?id={id}"));
+    }
 }

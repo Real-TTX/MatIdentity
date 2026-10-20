@@ -102,6 +102,42 @@
     </div>
 </form>
 
+@if (Model.IsEdit)
+{
+    <div class="mat-card">
+        <div class="mat-card__head"><icon name="monitor" /><span class="mat-card__title">Signed in</span></div>
+        @if (Model.Sessions.Count == 0)
+        {
+            <div class="mat-card__body"><p class="mat-muted">Not signed in anywhere right now.</p></div>
+        }
+        else
+        {
+            <div class="mat-table-wrap">
+                <table class="mat-table">
+                    <caption class="mat-sr-only">Where @Model.Input.DisplayName is signed in</caption>
+                    <thead><tr><th scope="col">Device</th><th scope="col" class="mat-hide-sm">Address</th><th scope="col">Last seen</th></tr></thead>
+                    <tbody>
+                        @foreach (var s in Model.Sessions)
+                        {
+                            <tr>
+                                <td data-label="Device"><span class="mat-table__name">@Format.Browser(s.UserAgent)</span></td>
+                                <td data-label="Address" class="mat-hide-sm mat-mono">@(s.IpAddress ?? "–")</td>
+                                <td data-label="Last seen" class="mat-nowrap">@Format.Ago(s.LastSeenAt)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="mat-card__body">
+                <form method="post" asp-page-handler="SignOut" data-confirm="Sign @Model.Input.DisplayName out everywhere? Every device and every app asks for the sign-in again." data-confirm-ok="Sign out" data-confirm-danger>
+                    <input type="hidden" name="id" value="@Model.Input.Id" />
+                    <button type="submit" class="mat-btn mat-btn--danger"><icon name="logout" /><span>Sign out everywhere</span></button>
+                </form>
+            </div>
+        }
+    </div>
+}
+
 @if (Model.IsEdit && Model.MailAvailable && !string.IsNullOrEmpty(Model.Input.Email))
 {
     <div class="mat-card">

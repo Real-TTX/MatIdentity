@@ -69,6 +69,9 @@ public class EditModel : PageModel
 
     public int MinPasswordLength { get; private set; } = PasswordPolicy.Floor;
 
+    /// <summary>Where the person is signed in now.</summary>
+    public IReadOnlyList<UserSession> Sessions { get; private set; } = [];
+
     [TempData] public string? StatusMessage { get; set; }
     [TempData] public bool IsError { get; set; }
 
@@ -138,6 +141,7 @@ public class EditModel : PageModel
             PasskeyCount = (await _passkeys.ListAsync(user.Id, HttpContext.RequestAborted)).Count;
             EmailVerified = user.EmailVerified;
             LockedUntil = user.LockedUntil > DateTime.UtcNow ? user.LockedUntil : null;
+            Sessions = await _sessions.ListActiveAsync(user.Id, HttpContext.RequestAborted);
             InvitationOpen = (await _accounts.OpenInvitationsAsync(HttpContext.RequestAborted)).Contains(user.Id);
         }
 
@@ -145,6 +149,23 @@ public class EditModel : PageModel
         Input.Invite = MailAvailable;
         MinPasswordLength = (await _config.GetAsync(HttpContext.RequestAborted)).PasswordMinLength;
         return Page();
+    }
+
+    /// <summary>Ends every sign-in of the person: the sessions here and the refresh tokens of the apps (the apps with a sign-out address hear it at once).</summary>
+    public async Task<IActionResult> OnPostSignOutAsync(long id)
+    {
+        if (await _userService.GetAsync(id, HttpContext.RequestAborted) is not { } user)
+        {
+            return NotFound();
+        }
+
+        var sessions = await _sessions.InvalidateAllAsync(user.Id, ct: HttpContext.RequestAborted);
+        var tokens = await _revoker.RevokeForSubjectAsync(user.Subject, HttpContext.RequestAborted);
+        await _activity.WriteAsync(ActivityKind.PersonChanged, username: User.GetUsername(), ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString(),
+            detail: $"{user.Username}: signed out everywhere ({sessions} sessions, {tokens} app sign-ins)", ct: HttpContext.RequestAborted);
+        StatusMessage = $"{user.DisplayName} is signed out everywhere.";
+        IsError = false;
+        return user.Id == User.GetUserId() ? RedirectToPage("/Account/Login", new { signedOut = true }) : RedirectToPage(new { id });
     }
 
     /// <summary>Ends a lock after too many wrong attempts (the person called and it was them).</summary>
