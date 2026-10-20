@@ -29,7 +29,8 @@ protocol becomes the page `StatusCode` with the error in words, because a reques
   256-bit key for the encryption. Losing them signs every app out; whoever has them can make tokens for every app.
 - The audience of a token is the app it is for. A person's access token is for the app that asked (`aud` = its client id). A machine asks for the scope
   `app:<id>` and gets the audience `<id>`. Every app has such a scope (`ClientService.EnsureAppScopeAsync`); an app that may call others gets the scopes of
-  all apps, also of the ones added later. MatIdentity's own API is `app:matidentity`.
+  all apps, also of the ones added later. MatIdentity's own API is `app:matidentity`: it can change the apps and their secrets, so it is never part of
+  "every app" and is given to an app by name only.
 - Ending sign-ins: `TokenRevoker` revokes the refresh tokens of a person (disabled, deleted, new password, "sign out on other devices") or of everyone.
   Access tokens are short (30 minutes by default) and are not revoked.
 
@@ -85,3 +86,30 @@ was right; five wrong codes and the person starts again. `SignInFlow.CompleteAsy
   passkey belongs to the public address of MatIdentity: changing that address loses the passkeys. The options of a ceremony stay on the server (two minutes,
   used once). The browser side is `wwwroot/js/matidentity.js`.
 - An administrator resets the second step of a person (authenticator off, passkeys removed) when a device is lost.
+
+## Mail and the links in it
+
+`Core/Mail/MailService` sends through **MatSMTP** when the environment names it (`MATSMTP_*`, read by MatPlatform's `MatSmtpSettings`, a copy in
+`src/MatIdentity.Web/MatPlatform/`, never edited here) and the own SMTP settings are then fixed (page and `/api/configure`); else through the SMTP server of
+the settings (its password encrypted with Data Protection); else there is no mail and every feature that needs it is hidden. Mail that anybody can trigger
+goes out after the answer (`MailQueue`), so an existing account does not answer slower than an unknown one.
+
+`AccountToken` is the key behind a link: 256 random bits, only its SHA-256 hash stored, used once, a new one replaces the old. Purposes: password reset
+(30 minutes, at most three an hour per account), invitation (7 days), e-mail verification (48 hours; it confirms only the address it was sent to, a new
+address is unconfirmed again). "Forgot your password?" and self-registration are offered only with a **public address**: their links never use the `Host`
+of a request (reset poisoning). A password set by link ends every other sign-in and counts as confirming the address. Self-registration (off by default)
+makes a disabled account that works after the confirmation; unconfirmed ones are removed after 7 days.
+
+## Sign-out reaches the apps
+
+OpenID Connect Back-Channel Logout 1.0. The ID token carries `sid`, the public id of the session (`SessionIds.Of`: a hash of the session token, never the
+token). A session remembers the apps it signed in to (`UserSession.ClientIds`). Whenever sessions end, `SessionService` tells its `ISessionEndListener`;
+the web project's `BackchannelLogout` sends every app with a sign-out address (`BackchannelLogoutUri`) a logout token (JWT `logout+jwt`, signed with the key
+of the ID tokens, `iss`, `aud`, `sub`, `sid`, `events`, `jti`, two minutes) after the answer; a person out everywhere (disabled, new password set by an
+administrator, signed out by one) is announced to every such app with `sub` alone. Front-channel logout is not offered: its iframes need third-party
+cookies. A `GET /connect/logout` without the person's `id_token_hint` asks first (a link from another site must not sign anyone out).
+
+## Brute force
+
+Per address: the rate limits. Per account: ten wrong passwords or second-step codes in a row lock the password sign-in for 15 minutes; the answer stays
+"Incorrect username or password", so a right password does not show through. The count resets only after a complete sign-in. A passkey alone still signs in.

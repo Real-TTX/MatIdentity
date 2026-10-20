@@ -28,16 +28,24 @@ registers every app it installs here and gives it its sign-in.
 ## At a glance
 
 **Sign-in**
-- **OpenID Connect** with authorization code and **PKCE** (enforced), refresh tokens, sign-out at every app (end session)
+- **OpenID Connect** with authorization code and **PKCE** (enforced), rolling refresh tokens (a replayed one ends the whole sign-in), sign-out at every app (end session)
+- **Back-channel logout**: signing out here tells every app with a sign-out address, so its session ends too (`sid` in the ID token)
 - **Single sign-on**: a session here signs a person into the next app without the form
 - Sessions live in SQLite and **survive a restart**; a person sees their devices and signs out the others
-- The tokens carry `sub` (a stable UUID), `name`, `preferred_username`, `email` and the `role` **of the app** (see Permissions)
+- The tokens carry `sub` (a stable UUID), `name`, `preferred_username`, `email`, `email_verified` and the `role` **of the app** (see Permissions)
+- Sign in with the user name or the e-mail address; ten wrong passwords or codes in a row lock the account for 15 minutes
 
 **Second step (optional for everyone)**
 - **Authenticator app** (TOTP, RFC 6238) with a QR code and 10 **recovery codes**, shown once
 - **Passkeys** (WebAuthn: Windows Hello, Touch ID, phone, security key): sign in **without a password**, or use one as the second step after it
 - Whoever has an authenticator app or a passkey is asked for it after the password; five wrong codes and it starts again
 - An administrator sees who uses what and resets it when a phone is lost
+
+**Mail** (through MatSMTP, or an SMTP server of your own; without mail these are hidden)
+- **Forgotten password**: a link by mail, single-use, 30 minutes, the same answer for every name
+- **Invitations**: create a person, they get a mail and choose their password
+- **Confirmed e-mail addresses**: `email_verified` is true once the person followed a link to the address
+- **Self-registration** (off by default): the account works after the address is confirmed
 
 **Permissions**
 - **Groups** (Family, Guests): apps and roles for many people at once
@@ -52,8 +60,10 @@ registers every app it installs here and gives it its sign-in.
 - **Apps calling apps**: an app with *calls other apps* gets a token for `app:<id>` (client credentials) whose audience is the other app
 
 **Administration**
-- **People**: create, change, disable; a disabled account or a new password signs the person out **everywhere** (sessions and the refresh tokens of the apps)
-- **Activity**: sign-ins, failed sign-ins (a badge in the menu), app sign-ins, machine tokens, changes to apps; kept for 90 days
+- **People**: create or invite, change, disable; see where a person is signed in; a disabled account or a new password signs the person out **everywhere** (sessions, the refresh tokens of the apps, and the apps with a sign-out address)
+- **Password rules**: a shortest length, never the user name, never one of the passwords tried first
+- **Activity**: sign-ins, failed sign-ins (a badge in the menu), locked accounts, app sign-ins, machine tokens, and every change of an administrator (apps, people, groups, settings); kept for 90 days
+- **Configuration export**: settings, apps, access, groups and people as JSON, never a secret
 - **Sign everyone out**: the emergency button
 - Rate limits on the sign-in form, the token endpoint and the API; forwarded headers only from known proxies
 
@@ -75,9 +85,27 @@ The form every app sends people to. A passkey signs in without the password; who
 |---|---|
 | ![Signing in with a passkey](docs/images/login-passkey.png) | ![The code of the authenticator app after the password](docs/images/second-step.png) |
 
+### Mail: invitations, forgotten passwords, confirmed addresses
+
+With MatSMTP (Mattiverse sets it) or an SMTP server of your own, a new person gets an invitation and chooses the password; whoever forgot theirs
+asks for a link; a confirmed address becomes `email_verified` in the tokens. The person's page shows where they are signed in and ends it everywhere.
+
+| A new person, invited | The link of the invitation |
+|---|---|
+| ![A new person with an invitation](docs/images/person-invite.png) | ![Choosing the password of an invitation](docs/images/invitation-welcome.png) |
+
+| Forgot your password? | Creating an account (when it is on) |
+|---|---|
+| ![Asking for a link](docs/images/forgot.png) | ![Self-registration](docs/images/register.png) |
+
+| A person: devices and mail | Invited, not confirmed yet |
+|---|---|
+| ![Where a person is signed in, and a password link](docs/images/person-sessions.png) | ![An open invitation](docs/images/person-invited.png) |
+
 ### The apps
 
 Every app that signs in here, with its id, what it may do and who added it. *Managed by mattiverse* marks the apps Mattiverse registered when it installed them.
+An app with a sign-out address hears when a person signs out here (back-channel logout).
 
 ![The list of apps](docs/images/apps.png)
 
@@ -122,8 +150,8 @@ Their devices are listed too; one click signs out the others.
 
 ### Activity and settings
 
-Sign-ins, failed sign-ins, app sign-ins, machine tokens and every change to an app, kept for 90 days. The settings hold the public address,
-how long a sign-in lasts and the emergency button that signs everyone out.
+Sign-ins, failed sign-ins, app sign-ins, machine tokens and every change of an administrator, kept for 90 days. The settings hold the public address,
+how long a sign-in lasts, the password rules, registration, the mail (fixed when MatSMTP sends it), the configuration export and the emergency button.
 
 | Activity | Settings |
 |---|---|
@@ -247,6 +275,8 @@ Then, in *Access*, give the app to the people or groups who may open it. Any oth
 | `MAT_API_KEY` | – | The key of the platform API (`X-Api-Key`); Mattiverse sets it |
 | `MatIdentity__Admin__Seed` | `false` | Create the admin from `__Username` / `__Password` (headless installs; the password must be changed at the first sign-in) |
 | `MatIdentity__RateLimits__SignIn` | `20` | Sign-in attempts a minute per address |
+| `MatIdentity__RefreshTokenReuseLeewaySeconds` | `30` | How long a used refresh token may come again (an app renewing twice in parallel); later it is a replay and ends the sign-in |
+| `MATSMTP_HOST` / `_PORT` / `_USERNAME` / `_PASSWORD` / `_FROM` / `_TLS` | – | Mail through MatSMTP (Mattiverse sets them); without them the SMTP server of *Settings*, or no mail. `_TLS`: `none`, `starttls` or `tls` |
 | `MATIDENTITY_PORT` | `2300` | Host port in the compose files |
 
 ## Mat platform: API and the apps of the family
@@ -260,9 +290,9 @@ MatIdentity speaks the platform contract of the Mat apps (MatDesign [docs/PLATFO
 | `GET /api/state[/key]` | The values of the tiles |
 | `GET/PUT /api/configure` | The settings Mattiverse may change |
 | `POST /api/actions/{id}` | The buttons: sign everyone out (the links open MatIdentity and its apps) |
-| `/api/v1/clients` | The apps, for Mattiverse (create, change, remove what it created) |
+| `/api/v1/clients` | The apps, for Mattiverse (create, change, remove what it created); `backchannelLogoutUri` and `callTargets` are optional |
 
-Access with `X-Api-Key: <MAT_API_KEY>` or a token of MatIdentity whose audience is `app:matidentity`.
+Access with `X-Api-Key: <MAT_API_KEY>` or a token of MatIdentity whose audience is `app:matidentity` (an app gets that scope only by name, never through "calls every app").
 
 The apps use the shared .NET package **MatPlatform** of MatDesign for their side: the endpoints, the sign-in through MatIdentity (auto-login, `?local=1`
 for the local form, sign-out at MatIdentity, the scheme behind a TLS proxy) and the rule for existing accounts: an account of the app that has the
@@ -273,7 +303,7 @@ same address is linked only after the person signed in to it once with its own p
 ```
 /data
 ├─ matidentity.db         SQLite: people, sessions, groups, access, activity, and OpenIddict's apps, scopes, authorizations, tokens
-├─ config/system.json     JSON: name, public address, how long a sign-in lasts, the lifetime of an access token
+├─ config/system.json     JSON: name, public address, sign-in, password rules, registration, the own SMTP server (its password encrypted)
 ├─ dataprotection-keys/   the keys of the cookies (so sessions survive restarts)
 └─ token-keys/            the RSA key that signs the tokens and the key that encrypts codes and refresh tokens
 ```
@@ -315,6 +345,8 @@ platform key is `dev-key`.
 | The platform contract (`/api`, health, state, configure, actions) | ✅ |
 | Authenticator app (TOTP), recovery codes, passkeys (passwordless and as second step) | ✅ |
 | Groups, access and roles per app, which apps an app may call | ✅ |
+| Mail (MatSMTP or own SMTP): password reset, invitations, e-mail verification, self-registration | ✅ |
+| Back-channel logout, lockout per account, password rules, audit of administrators, configuration export | ✅ |
 | The apps of the family signing in through it (`MATIDENTITY_*`) | ✅ MatSplit, MatTrakr, MatPlay, MatBu, Matdo, MatFile, MatPaper, MatDock, Matcad, Matddns · MatMail in progress |
 
 ## License

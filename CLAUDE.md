@@ -21,8 +21,10 @@ rulebook. The accent is `#a21a50` (registered in MatDesign's `AppRegistry`; `#9d
 - **Build:** `dotnet build MatIdentity.slnx` (note: `.slnx`). SDK 10 (see `global.json`). Expected: 0 warnings.
 - **Tests:** `dotnet test`: xunit. `ClientRulesTests` (rules without the site), `MigrationLockTests` (a stale EF migration lock is removed at start),
   `WebUiTests` (the source of the pages: icons of the sprite, no inline style or script, tokens only in the stylesheet), and the whole site in memory (`IdentityFactory`, a `WebApplicationFactory` on its own temp data folder, Development, key `test-key-…`):
-  `OidcFlowTests` (discovery, code + PKCE end to end with the real sign-in form, single sign-on, refresh, machine tokens and audiences, wrong secret = 401)
-  and `PlatformApiTests` (the contract, access, configure, the client API, every page opens). The site tests share one collection (environment variables).
+  `OidcFlowTests` (discovery, code + PKCE end to end with the real sign-in form, single sign-on, refresh and its reuse, sign-out with and without id_token_hint, machine tokens
+  and audiences, wrong secret = 401), `PlatformApiTests` (the contract, access, configure, the client API, every page opens), `MailTests`, `AccountMailTests`, `RegistrationTests`,
+  `BackchannelLogoutTests`, `LockoutTests`, `AuditTests`, `ExportTests`. The site runs with `MATSMTP_*` and a public address; its mail and back-channel requests are recorded
+  (`RecordingMailTransport`, `RecordingHttpHandler`), nothing leaves the test. The site tests share one collection (environment variables).
 - **Run / test the app: always rebuild the container and redeploy the stack** (project rule): `./scripts/redeploy.ps1` (`-Fresh` wipes the volume and with it the token keys,
   `-Port` changes the host port). Dev stack: `docker-compose.dev.yml` (app + `sqlite-web` on 2309, subnet `10.253.24.0/24` because the PC has its Docker address pools used up).
   In `Development` the account `admin@example.com` / `Start12345` exists and `MAT_API_KEY` is `dev-key`.
@@ -39,18 +41,21 @@ rulebook. The accent is `#a21a50` (registered in MatDesign's `AppRegistry`; `#9d
 
 ```
 src/MatIdentity.Core       domain, no web types
-  Entities/ Data/            User (Subject = the claim sub), UserSession, ActivityEntry; DbContext (+ OpenIddict's tables Oidc*), migrations
-  Auth/ Users/ Security/     sign-in, sessions in SQLite, TwoFactorService (TOTP, recovery codes), PasskeyService, Totp (RFC 6238), PBKDF2 hasher, secret protector
+  Entities/ Data/            User (Subject = the claim sub), UserSession, ActivityEntry, AccountToken (links in mails, hashed); DbContext (+ OpenIddict's tables Oidc*), migrations
+  Auth/ Users/ Security/     sign-in and lockout, sessions in SQLite (ISessionEndListener, sid), TwoFactorService, PasskeyService, Totp, PBKDF2 hasher, secret protector;
+                             AccountTokenService + AccountMailService (reset, invitation, verification, registration), PasswordPolicy
+  Mail/                      MailService (MatSMTP or own SMTP), MailKit transport, MailQueue, MailTemplates
   Access/                    PermissionService (who may sign in where, with which role; app roles; which apps an app may call), GroupService
   Clients/                   ClientModels (ClientInfo, ClientRules), ClientService (the apps over OpenIddict, their scopes app:<id>), TokenRevoker
   Activity/                  ActivityService (the activity list, 90 days)
-  Configuration/             options, AppPaths, JsonConfigStore, SystemConfig(+Service: the settings and their rules)
+  Configuration/             options, AppPaths, JsonConfigStore, SystemConfig(+Service: the settings and their rules), ConfigurationExport (JSON without secrets)
 src/MatIdentity.Web        Razor Pages, controls, endpoints, Program.cs (OpenIddict, cookie, rate limits, forwarded headers)
-  Infrastructure/            OidcEndpoints (authorize, token, userinfo, logout), SignInFlow (the end of every sign-in, the second step), PasskeyEndpoints (WebAuthn), TokenKeys, ApiAccess (X-Api-Key or token for app:matidentity),
+  Infrastructure/            OidcEndpoints (authorize, token, userinfo, logout), BackchannelLogout (logout tokens to the apps), LocalUrl, SignInFlow (the end of every sign-in, the second step), PasskeyEndpoints (WebAuthn), TokenKeys, ApiAccess (X-Api-Key or token for app:matidentity),
                              ClientApiEndpoints (/api/v1/clients for Mattiverse), RateLimits, session validation, setup and password guards, health check
+  MatPlatform/               a copy of MatDesign's MatPlatform 1.3.0 (tools/matplatform-copy.js; never edit here): MatSmtpSettings
   Platform/                  MatApiDefinition (the contract's types), PlatformEndpoints (/api, health, state, configure, actions), IdentityPlatform (MatIdentity's part)
   Pages/                     Index (your apps; figures for an administrator), Apps/ (Edit, Access), Users/ (People), Groups/, Activity/, Settings/, Account/ (Login, TwoFactor,
-                             NoAccess, Logout, Profile: general, password, devices; Security: authenticator app, recovery codes, passkeys), Setup, StatusCode (also the errors of the protocol), Error
+                             NoAccess, Logout, Forgot, Reset, Verify, Register, Profile: general, password, devices; Security: authenticator app, recovery codes, passkeys), Setup, StatusCode (also the errors of the protocol), Error
   Support/ Controls/         Ui (icons, logo, app letters and hues), Navigation, Crumbs, Format, Authority, Toolkit; tag helpers (mat-field, icon, tab-bar), ListModels
   wwwroot/                   matui/ (the toolkit, a copy), css/matidentity.css (mi-* only), js/matidentity.js, img/ (logo, favicon, PWA icons), manifest
 tests/MatIdentity.Tests     unit tests + the site in memory
@@ -63,6 +68,8 @@ tests/MatIdentity.Tests     unit tests + the site in memory
 - A secret is never written in plain text anywhere: not in the database (OpenIddict hashes it), not in a cookie or TempData (a new secret is shown on the page of the POST
   itself), not in the activity list or a log.
 - No DbContext, no EF Core and no SQL in MatIdentity.Web (`WebUiTests` checks; only Program.cs registers the context): the pages and endpoints call the services of Core.
+- Links in mails only from the public address (`Authority.PublicAsync`) when anybody can ask for them; mail anybody can trigger goes through `MailQueue`.
+- Every new password goes through `PasswordPolicy`; every end of a session through `SessionService` (it tells the apps).
 - The sign-in limit (20 attempts a minute per address) counts POSTs only; `MatIdentity__RateLimits__SignIn` changes it (the tests raise it).
 - Whatever ends a person's access ends it everywhere: sessions here (`SessionService.InvalidateAllAsync`) **and** the refresh tokens of the apps (`TokenRevoker`).
 - The page and the API share their rules (`ClientRules`, `SystemConfigService`): never check a value only in one of them.
