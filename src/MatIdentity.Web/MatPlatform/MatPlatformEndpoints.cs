@@ -1,4 +1,4 @@
-// MatPlatform 1.3.0 – a copy from MatDesign, do not edit here
+// MatPlatform 1.5.0 – a copy from MatDesign, do not edit here
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Threading.RateLimiting;
@@ -25,7 +25,7 @@ public static class MatPlatformEndpoints
 
     /// <summary>
     /// Registers the platform: the description of the app (<paramref name="describe"/>), the settings from the environment (<c>MAT_API_KEY</c>,
-    /// <c>MATIDENTITY_*</c>), the key check and the rate limit of the anonymous endpoints. The values come from the services that implement
+    /// <c>MATIDENTITY_*</c>), the key check, the rate limit of the anonymous endpoints and the headers of <c>MAT_FRAME_ANCESTORS</c> (<see cref="MatFrameAncestors"/>). The values come from the services that implement
     /// <see cref="IMatPlatformState"/>, <see cref="IMatPlatformConfiguration"/>, <see cref="IMatPlatformActions"/> and <see cref="IMatPlatformHealth"/>
     /// (<see cref="AddMatPlatform{TApp}"/> registers one class for all). Returns the settings for <c>AddMatIdentitySignIn</c>.
     /// </summary>
@@ -44,6 +44,8 @@ public static class MatPlatformEndpoints
         builder.Services.AddSingleton(options);
         builder.Services.AddSingleton(settings);
         builder.Services.AddSingleton<MatApiAccess>();
+        // MAT_FRAME_ANCESTORS: who may show the app in a frame (Mattiverse); nothing without it.
+        builder.Services.AddMatFrameAncestors();
 
         // Per caller address: a consumer that polls every few seconds is fine, a flood is not.
         builder.Services.AddRateLimiter(limiter =>
@@ -98,11 +100,14 @@ public static class MatPlatformEndpoints
 
     /// <summary>
     /// Maps the endpoints. <c>/api</c> and <c>/api/health</c> are anonymous (rate limited: call <c>app.UseRateLimiter()</c>); the rest needs the key or a token.
+    /// With the sign-in through MatIdentity on it also maps the back-channel logout (<see cref="MatIdentitySignIn.MapMatIdentityBackchannelLogout"/>).
     /// Returns the protected group <c>/api</c>, for the app's own <c>/api/provides/...</c>.
     /// </summary>
     public static RouteGroupBuilder MapMatPlatform(this IEndpointRouteBuilder app)
     {
         ArgumentNullException.ThrowIfNull(app);
+
+        app.MapMatIdentityBackchannelLogout();
 
         var json = MatApiDefinition.Json;
 

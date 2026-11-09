@@ -52,7 +52,7 @@ src/MatIdentity.Core       domain, no web types
 src/MatIdentity.Web        Razor Pages, controls, endpoints, Program.cs (OpenIddict, cookie, rate limits, forwarded headers)
   Infrastructure/            OidcEndpoints (authorize, token, userinfo, logout), BackchannelLogout (logout tokens to the apps), LocalUrl, SignInFlow (the end of every sign-in, the second step), PasskeyEndpoints (WebAuthn), TokenKeys, ApiAccess (X-Api-Key or token for app:matidentity),
                              ClientApiEndpoints (/api/v1/clients for Mattiverse), RateLimits, session validation, setup and password guards, health check
-  MatPlatform/               a copy of MatDesign's MatPlatform 1.3.0 (tools/matplatform-copy.js; never edit here): MatSmtpSettings
+  MatPlatform/               a copy of MatDesign's MatPlatform 1.5.0 (tools/matplatform-copy.js; never edit here): MatSmtpSettings, MatFrameAncestors (MAT_FRAME_ANCESTORS, registered in Program.cs)
   Platform/                  MatApiDefinition (the contract's types), PlatformEndpoints (/api, health, state, configure, actions), IdentityPlatform (MatIdentity's part)
   Pages/                     Index (your apps; figures for an administrator), Apps/ (Edit, Access), Users/ (People), Groups/, Activity/, Settings/, Account/ (Login, TwoFactor,
                              NoAccess, Logout, Forgot, Reset, Verify, Register, Profile: general, password, devices; Security: authenticator app, recovery codes, passkeys), Setup, StatusCode (also the errors of the protocol), Error

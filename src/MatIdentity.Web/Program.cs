@@ -85,6 +85,8 @@ builder.Services.AddSingleton(new MatIdentity.Core.Mail.MailRelay
         : null,
     Description = matSmtp.Describe("en"),
 });
+// MAT_FRAME_ANCESTORS: the origins that may show MatIdentity in a frame, such as Mattiverse (MatPlatform's MatFrameAncestors; without it nothing changes).
+MatPlatform.MatFrameAncestors.AddMatFrameAncestors(builder.Services);
 builder.Services.AddMatIdentityCore();
 builder.Services.AddMatIdentityRateLimits(builder.Configuration);
 

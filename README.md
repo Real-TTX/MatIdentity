@@ -273,6 +273,7 @@ Then, in *Access*, give the app to the people or groups who may open it. Any oth
 | `MatIdentity__Issuer` | – | The public address (`iss`); the setting in the UI wins. Empty: the address of the request |
 | `MatIdentity__TrustedProxies` | private networks | Who may send `X-Forwarded-*` (addresses or networks, comma-separated) |
 | `MAT_API_KEY` | – | The key of the platform API (`X-Api-Key`); Mattiverse sets it |
+| `MAT_FRAME_ANCESTORS` | – | The addresses (origins) that may show MatIdentity in a frame, separated by spaces, such as `http://localhost:8030 https://mattiverse.example.com`: Mattiverse sets its own, so it can open MatIdentity in the window of its home screen. With it, answers carry `frame-ancestors 'self' <origins>` instead of `X-Frame-Options`; anything that is not an origin (a path, `*`) is left out. Not set: nobody may frame MatIdentity. |
 | `MatIdentity__Admin__Seed` | `false` | Create the admin from `__Username` / `__Password` (headless installs; the password must be changed at the first sign-in) |
 | `MatIdentity__RateLimits__SignIn` | `20` | Sign-in attempts a minute per address |
 | `MatIdentity__RefreshTokenReuseLeewaySeconds` | `30` | How long a used refresh token may come again (an app renewing twice in parallel); later it is a replay and ends the sign-in |
