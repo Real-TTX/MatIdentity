@@ -4,6 +4,7 @@ using MatIdentity.Core.Clients;
 using MatIdentity.Core.Entities;
 using MatIdentity.Core.Users;
 using MatIdentity.Web.Platform;
+using MatPlatform;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace MatIdentity.Web.Pages;
@@ -16,17 +17,19 @@ public class IndexModel : PageModel
 {
     private readonly ClientService _clients;
     private readonly ActivityService _activity;
-    private readonly IMatPlatformApp _platform;
+    private readonly IdentityPlatform _platform;
+    private readonly MatPlatformOptions _definition;
     private readonly PermissionService _permissions;
     private readonly UserService _users;
 
-    public IndexModel(ClientService clients, ActivityService activity, IMatPlatformApp platform, PermissionService permissions, UserService users)
+    public IndexModel(ClientService clients, ActivityService activity, IdentityPlatform platform, MatPlatformOptions definition, PermissionService permissions, UserService users)
     {
         _permissions = permissions;
         _users = users;
         _clients = clients;
         _activity = activity;
         _platform = platform;
+        _definition = definition;
     }
 
     public IReadOnlyList<ClientInfo> Apps { get; private set; } = [];
@@ -51,7 +54,7 @@ public class IndexModel : PageModel
 
         if (User.IsAdmin())
         {
-            var definition = _platform.Definition(HttpContext);
+            var definition = _definition.Definition(_definition.DefaultLanguage, new MatAuthInfo(false, null));
             var values = await _platform.StateAsync(ct);
             Tiles = definition.State.Where(s => s.Widget == "number" && values.ContainsKey(s.Key)).Select(s => (s, values[s.Key])).ToList();
             Recent = await _activity.GetRecentAsync(8, ct);

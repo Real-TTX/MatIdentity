@@ -45,10 +45,25 @@ but OpenIddict's columns and no soft delete: OpenIddict prunes its tokens itself
 
 ## The platform contract
 
-MatIdentity is the first app with the contract of docs/PLATFORM.md (MatDesign). `Platform/MatApiDefinition.cs` holds the types of the contract and knows nothing of
-MatIdentity; `Platform/PlatformEndpoints.cs` maps them to the endpoints; `Platform/IdentityPlatform.cs` is MatIdentity's part (its tiles, settings and buttons).
-The first two are meant to become the shared package `MatPlatform` once a second app uses them. The settings of `/api/configure` are checked by the same
-`SystemConfigService` as the Settings page.
+MatIdentity speaks contract 2 of docs/PLATFORM.md (MatDesign) through the shared package **MatPlatform** (a copy in `src/MatIdentity.Web/MatPlatform/`, never edited
+here): `AddMatPlatform` / `MapMatPlatform` in Program.cs serve `/api`, `/api/health`, `/api/state`, `/api/configure`, `/api/actions/{id}`, `/api/bindings`,
+`/api/connections` and the form of the Connections area. `Platform/IdentityPlatform.cs` is MatIdentity's part: its description (tiles, settings, buttons; it provides
+`identity.oidc` and consumes `mail.smtp`) and its values. The settings of `/api/configure` are checked by the same `SystemConfigService` as the Settings page
+(`CheckValues` is off). Access: the same key as `/api/v1` (`MatIdentity__ApiKey`, else `MAT_API_KEY`), or a token MatIdentity issued for its own API (audience
+`matidentity`): MatPlatform asks the scheme `MatIdentityBearer`, which is `IdentityBearerHandler` here (its own validation, the same check as `ApiAccess`).
+
+**The capability `identity.oidc`.** A binding is an OpenID Connect client (`Platform/IdentityBindings.cs`, an `IMatBindingHandler`), made the one way every managed app
+is made: `ClientService.UpsertAsync` (rules, roles, call targets, then the client; what is not given is kept) and `ClientService.RemoveManagedAsync` (only with the
+caller's mark), which `/api/v1/clients` uses too. Client id = the consumer id (`-app` added below two characters); for every public address of the consumer
+`<address><callback>` and `<address><signedOut>`; the back-channel logout at `<internalUrl><backchannel>` (none without an internal address or with an empty
+`backchannel`); the roles from the consumer's `/api` (`AppRolesReader`, the internal address first; kept when it cannot be read); a secret only when the client is
+new or renewed. A request without addresses (a new key from the Connections area) keeps the client's addresses. The values: the public address as the authority
+(else the address the broker names), the provider's internal address, the client id and the secret. **Listed** are the clients with a mark (`managedBy`: bindings,
+and `/api/v1` with a mark, Mattiverse's own client too); an app added under Apps has none, so it is no binding and a binding endpoint never removes it. *Since* is
+when the app's rules were written first (`AppPolicy.CreateDate`), *last used* the last app sign-in or machine token of the activity list (90 days).
+**By hand:** the Connections area (`/Connections`, `<mat-connections />`, administrators) makes a client from a name alone, marked `manual`
+(`ClientRules.ManagedByHand`): it may be without sign-in addresses until an administrator adds them under Apps. The area is English like the rest of MatIdentity
+(the UI culture is set for its page and its form).
 
 ## Security
 
@@ -69,8 +84,8 @@ a code is made and `/connect/token` asks it again at every code and refresh, so 
 4. Everyone else is sent to `/Account/NoAccess`, not back to the app (the app would only show an error of its own).
 
 Per app, `RoleMode` says who decides the roles: `MatIdentity` (the claim `role` is the role of the app) or `App` (no claim `role`; the app gives rights
-itself). The roles of an app are the field `roles` of its MatApiDefinition (read on request from `<address>/api`), sent by Mattiverse through the client API,
-or written down; without any, `admin` and `user`. Machine tokens follow `AppPolicy.CallsAllApps` and `AppCallGrant`: `ClientService.SyncCallScopesAsync` writes
+itself). The roles of an app are the field `roles` of its MatApiDefinition (read on request from `<address>/api`, and with every binding of `identity.oidc`),
+sent through the client API, or written down; without any, `admin` and `user`. Machine tokens follow `AppPolicy.CallsAllApps` and `AppCallGrant`: `ClientService.SyncCallScopesAsync` writes
 the allowed `app:<id>` scopes into the permissions of the OpenIddict application.
 
 ## The second step

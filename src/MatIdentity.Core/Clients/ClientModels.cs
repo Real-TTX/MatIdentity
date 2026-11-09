@@ -1,4 +1,6 @@
 using System.Text.RegularExpressions;
+using MatIdentity.Core.Access;
+using MatIdentity.Core.Entities;
 
 namespace MatIdentity.Core.Clients;
 
@@ -35,7 +37,10 @@ public sealed record ClientInfo
     /// </summary>
     public string? BackchannelLogoutUri { get; init; }
 
-    /// <summary>Who created it: <c>mattiverse</c> when Mattiverse installed the app (docs/PLATFORM.md), else null (an administrator in the UI).</summary>
+    /// <summary>
+    /// Who created it: <c>mattiverse</c> when Mattiverse installed the app (docs/PLATFORM.md), <c>manual</c> when an administrator connected it in the Connections area
+    /// (<see cref="ClientRules.ManagedByHand"/>), else null (an administrator under Apps).
+    /// </summary>
     public string? ManagedBy { get; init; }
 }
 
@@ -43,6 +48,64 @@ public sealed record ClientInfo
 public sealed record ClientSaveResult(ClientInfo? Client, string? Secret, IReadOnlyDictionary<string, string> Errors)
 {
     public bool Succeeded => Errors.Count == 0;
+}
+
+/// <summary>
+/// An app as a caller registers it, by its id: the API <c>/api/v1/clients</c> (Mattiverse's own client) and the bindings of the capability <c>identity.oidc</c>
+/// (<see cref="ClientService.UpsertAsync"/>). Every other value is optional; what is missing keeps its value, or the default for a new app.
+/// </summary>
+public sealed record ClientUpsert
+{
+    public required string ClientId { get; init; }
+
+    public string? DisplayName { get; init; }
+
+    /// <summary>"" removes it.</summary>
+    public string? HomeUrl { get; init; }
+
+    public IReadOnlyList<string>? RedirectUris { get; init; }
+
+    public IReadOnlyList<string>? PostLogoutRedirectUris { get; init; }
+
+    public bool? AllowSignIn { get; init; }
+
+    public bool? AllowMachine { get; init; }
+
+    public bool? IsPublic { get; init; }
+
+    /// <summary>The mark of the caller (<c>mattiverse</c>, <c>manual</c>): a caller removes only what carries its own mark.</summary>
+    public string? ManagedBy { get; init; }
+
+    /// <summary>"" removes it.</summary>
+    public string? BackchannelLogoutUri { get; init; }
+
+    /// <summary>A new secret even when the app has one (the old one stops working at once).</summary>
+    public bool RenewSecret { get; init; }
+
+    public RoleMode? RoleMode { get; init; }
+
+    /// <summary>The roles of the app, the most powerful first.</summary>
+    public IReadOnlyList<RoleInfo>? Roles { get; init; }
+
+    public bool? OpenToEveryone { get; init; }
+
+    public bool? CallsAllApps { get; init; }
+
+    /// <summary>The apps it may call by name (also MatIdentity's own API, which "every app" leaves out).</summary>
+    public IReadOnlyList<string>? CallTargets { get; init; }
+}
+
+/// <summary>What <see cref="ClientService.UpsertAsync"/> did: the save (the app and its secret when one was made now, or the errors) and whether the app is new.</summary>
+public sealed record ClientUpsertResult(ClientSaveResult Saved, bool Created);
+
+/// <summary>What <see cref="ClientService.RemoveManagedAsync"/> did.</summary>
+public enum ClientRemoval
+{
+    Removed,
+    NotFound,
+
+    /// <summary>The app carries another mark than the caller's: it was not removed.</summary>
+    OtherMark,
 }
 
 /// <summary>The rules of a client, shared by the page and the API.</summary>
@@ -53,6 +116,12 @@ public static partial class ClientRules
 
     /// <summary>The id of MatIdentity itself as an app of the family (its own API is the audience <c>matidentity</c>).</summary>
     public const string SelfId = "matidentity";
+
+    /// <summary>
+    /// The mark of an app an administrator connected by hand in the Connections area (<c>managedBy: manual</c> of the platform contract, "Bindings"). The area knows only
+    /// the name of the app, so it gets its id and secret first and its sign-in addresses afterwards, under Apps: until then it may be without one.
+    /// </summary>
+    public const string ManagedByHand = "manual";
 
     [GeneratedRegex("^[a-z0-9][a-z0-9_-]{1,62}$")]
     private static partial Regex ClientIdRegex();
@@ -107,7 +176,7 @@ public static partial class ClientRules
             errors["allowMachine"] = "A public app has no secret, so it cannot get a token for itself.";
         }
 
-        if (client.AllowSignIn && client.RedirectUris.Count == 0)
+        if (client.AllowSignIn && client.RedirectUris.Count == 0 && client.ManagedBy != ManagedByHand)
         {
             errors["redirectUris"] = "Add the address the app receives the sign-in at (like https://split.example.com/signin-oidc).";
         }

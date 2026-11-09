@@ -1,12 +1,14 @@
 using System.Net.Http.Json;
 using MatIdentity.Core.Access;
 using MatIdentity.Core.Clients;
+using MatPlatform;
 
 namespace MatIdentity.Web.Platform;
 
 /// <summary>
 /// Reads the roles an app announces in its MatApiDefinition (<c>GET &lt;address&gt;/api</c>, field <c>roles</c>), so an administrator does not have to type them.
-/// Only on request of an administrator, only from the address of the app, short timeout, nothing followed but the answer.
+/// Only on request of an administrator or of a binding of <c>identity.oidc</c>, only from the address of the app, short timeout, nothing followed but the answer.
+/// It reads the field <c>roles</c> and nothing else: a definition of any contract version will do (a consumer ignores what it does not know).
 /// </summary>
 public sealed class AppRolesReader
 {
@@ -18,9 +20,13 @@ public sealed class AppRolesReader
     }
 
     /// <summary>The roles, or an error for a person.</summary>
-    public async Task<(IReadOnlyList<RoleInfo>? Roles, string? Error)> ReadAsync(ClientInfo app, CancellationToken ct)
+    public Task<(IReadOnlyList<RoleInfo>? Roles, string? Error)> ReadAsync(ClientInfo app, CancellationToken ct)
+        => ReadAsync(app.HomeUrl, ct);
+
+    /// <summary>The roles of the app at <paramref name="address"/> (its root), or an error for a person.</summary>
+    public async Task<(IReadOnlyList<RoleInfo>? Roles, string? Error)> ReadAsync(string? address, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(app.HomeUrl) || !Uri.TryCreate(app.HomeUrl.TrimEnd('/') + "/api", UriKind.Absolute, out var url))
+        if (string.IsNullOrWhiteSpace(address) || !Uri.TryCreate(address.Trim().TrimEnd('/') + "/api", UriKind.Absolute, out var url) || url.Scheme is not ("http" or "https"))
         {
             return (null, "The app has no address to ask.");
         }

@@ -76,7 +76,7 @@ public static class Navigation
 {
     /// <summary>
     /// What the signed-in person sees: everyone their apps (the start page); an administrator also the apps to manage, the people, the activity
-    /// (a badge warns about failed sign-ins of the last 24 hours) and the settings. One menu, so there is no switcher.
+    /// (a badge warns about failed sign-ins of the last 24 hours), the connections (the Connections area of the platform) and the settings. One menu, so there is no switcher.
     /// </summary>
     public static IReadOnlyList<NavSet> For(bool isAdmin, int failedSignIns)
     {
@@ -87,6 +87,7 @@ public static class Navigation
             items.Add(new("People", "/Users", "users"));
             items.Add(new("Groups", "/Groups", "layers"));
             items.Add(new("Activity", "/Activity", "activity", failedSignIns > 0 ? NavBadge.Count(failedSignIns, "warn", failedSignIns == 1 ? "failed sign-in" : "failed sign-ins") : null));
+            items.Add(new("Connections", "/Connections", "plug"));
             items.Add(new("Settings", "/Settings", "settings"));
         }
 

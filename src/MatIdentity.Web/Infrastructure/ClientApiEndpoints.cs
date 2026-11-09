@@ -2,14 +2,15 @@ using MatIdentity.Core.Access;
 using MatIdentity.Core.Activity;
 using MatIdentity.Core.Clients;
 using MatIdentity.Core.Entities;
-using MatIdentity.Web.Platform;
+using MatPlatform;
 
 namespace MatIdentity.Web.Infrastructure;
 
 /// <summary>
-/// The API Mattiverse uses to register an app when it installs it (docs/PLATFORM.md, "Sign-in with MatIdentity"): the same rules as the
-/// pages, the same key or token as the rest of <c>/api</c>. Like the engines' APIs: an upsert by id, <c>managedBy</c> marks what a caller created,
-/// and a caller only deletes what carries its own mark.
+/// The API of the apps (docs/PLATFORM.md, "Sign-in with MatIdentity"): Mattiverse registers itself here (client <c>mattiverse</c>, calls every app); the apps it installs are
+/// bound through <c>/api/bindings/identity.oidc/...</c> (<see cref="Platform.IdentityBindings"/>), which goes the same way (<see cref="ClientService.UpsertAsync"/>,
+/// <see cref="ClientService.RemoveManagedAsync"/>). The same rules as the pages, the same key or token as the rest of <c>/api</c>. Like the engines' APIs: an upsert by id,
+/// <c>managedBy</c> marks what a caller created, and a caller only deletes what carries its own mark.
 /// <code>
 /// GET    /api/v1/status                      { ok, app, version, apiVersion: 1 } (as the engines of Mattiverse answer it)
 /// GET    /api/v1/clients                     the apps (never a secret)
@@ -41,61 +42,43 @@ public static class ClientApiEndpoints
 
         api.MapPut("/{clientId}", async (string clientId, ClientBody body, HttpContext http, ClientService clients, PermissionService permissions, ActivityService activity, CancellationToken ct) =>
         {
-            var existing = await clients.GetAsync(clientId, ct);
-
-            // The rules first (the app's scopes are written from them when it is saved); the roles are checked before anything is saved.
-            var roles = body.Roles?.Select(r => new RoleInfo(r.Key ?? string.Empty, r.Label ?? r.Key ?? string.Empty)).ToList();
-            var roleErrors = roles is null ? new Dictionary<string, string>() : PermissionService.ValidateRoles(roles);
+            // The same way as a binding of identity.oidc (ClientService.UpsertAsync): the rules first, the id and the roles checked before anything is saved.
             var roleMode = body.RoleMode switch { "app" => RoleMode.App, "matidentity" => RoleMode.MatIdentity, _ => (RoleMode?)null };
-            if (body.RoleMode is not null && roleMode is null)
-            {
-                roleErrors["roleMode"] = "Use \"matidentity\" or \"app\".";
-            }
-
-            if (roleErrors.Count > 0 || !ClientRules.IsValidClientId(clientId))
-            {
-                if (!ClientRules.IsValidClientId(clientId))
-                {
-                    roleErrors["clientId"] = "Use 2 to 63 small letters, digits, - or _, starting with a letter or digit.";
-                }
-
-                return Results.Json(new { errors = roleErrors }, options, statusCode: StatusCodes.Status400BadRequest);
-            }
-
-            var policy = await permissions.PolicyAsync(clientId, ct);
-            await permissions.SavePolicyAsync(clientId, roleMode ?? policy.RoleMode, body.OpenToEveryone ?? policy.OpenToEveryone, body.CallsAllApps ?? policy.CallsAllApps, ct);
-            if (roles is not null)
-            {
-                await permissions.SaveRolesAsync(clientId, roles, ct);
-            }
-
-            // The apps it may call by name (also MatIdentity's own API, which "every app" leaves out).
-            if (body.CallTargets is not null)
-            {
-                await permissions.SetCallTargetsAsync(clientId, body.CallTargets.Where(ClientRules.IsValidClientId).Distinct(StringComparer.Ordinal), ct);
-            }
-            var input = new ClientInfo
+            var upsert = new ClientUpsert
             {
                 ClientId = clientId,
-                DisplayName = body.DisplayName ?? existing?.DisplayName ?? clientId,
-                HomeUrl = body.HomeUrl ?? existing?.HomeUrl,
-                AllowSignIn = body.AllowSignIn ?? existing?.AllowSignIn ?? true,
-                AllowMachine = body.AllowMachine ?? existing?.AllowMachine ?? false,
-                IsPublic = body.IsPublic ?? existing?.IsPublic ?? false,
-                RedirectUris = body.RedirectUris ?? existing?.RedirectUris ?? [],
-                PostLogoutRedirectUris = body.PostLogoutRedirectUris ?? existing?.PostLogoutRedirectUris ?? [],
-                BackchannelLogoutUri = body.BackchannelLogoutUri ?? existing?.BackchannelLogoutUri,
-                ManagedBy = body.ManagedBy ?? existing?.ManagedBy,
+                DisplayName = body.DisplayName,
+                HomeUrl = body.HomeUrl,
+                AllowSignIn = body.AllowSignIn,
+                AllowMachine = body.AllowMachine,
+                IsPublic = body.IsPublic,
+                RedirectUris = body.RedirectUris,
+                PostLogoutRedirectUris = body.PostLogoutRedirectUris,
+                BackchannelLogoutUri = body.BackchannelLogoutUri,
+                ManagedBy = body.ManagedBy,
+                RenewSecret = body.RenewSecret == true,
+                RoleMode = roleMode,
+                Roles = body.Roles?.Select(r => new RoleInfo(r.Key ?? string.Empty, r.Label ?? r.Key ?? string.Empty)).ToList(),
+                OpenToEveryone = body.OpenToEveryone,
+                CallsAllApps = body.CallsAllApps,
+                CallTargets = body.CallTargets,
             };
 
-            var result = await clients.SaveAsync(input, body.RenewSecret == true, ct);
+            if (body.RoleMode is not null && roleMode is null)
+            {
+                var errors = ClientService.CheckUpsert(upsert);
+                errors["roleMode"] = "Use \"matidentity\" or \"app\".";
+                return Results.Json(new { errors }, options, statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            var (result, created) = await clients.UpsertAsync(upsert, ct);
             if (!result.Succeeded)
             {
                 return Results.Json(new { errors = result.Errors }, options, statusCode: StatusCodes.Status400BadRequest);
             }
 
             var caller = http.Items[ApiAccess.CallerKey] as string;
-            await activity.WriteAsync(existing is null ? ActivityKind.ClientCreated : result.Secret is null ? ActivityKind.ClientChanged : ActivityKind.ClientSecretRenewed,
+            await activity.WriteAsync(created ? ActivityKind.ClientCreated : result.Secret is null ? ActivityKind.ClientChanged : ActivityKind.ClientSecretRenewed,
                 username: caller, clientId: clientId, ipAddress: http.Connection.RemoteIpAddress?.ToString(), detail: "Through the API", ct: ct);
             var saved = await permissions.PolicyAsync(clientId, ct);
             return Results.Json(new
@@ -111,20 +94,16 @@ public static class ClientApiEndpoints
 
         api.MapDelete("/{clientId}", async (string clientId, string? managedBy, HttpContext http, ClientService clients, ActivityService activity, CancellationToken ct) =>
         {
-            var existing = await clients.GetAsync(clientId, ct);
-            if (existing is null)
-            {
-                return NotFound(clientId);
-            }
-
             // Never delete what the caller did not create.
             // No mark and an empty mark are the same (an app added in the UI is deleted with ?managedBy=).
-            if (!string.Equals(existing.ManagedBy ?? string.Empty, managedBy ?? string.Empty, StringComparison.Ordinal))
+            switch (await clients.RemoveManagedAsync(clientId, managedBy ?? string.Empty, ct))
             {
-                return Results.Json(new { errors = new Dictionary<string, string> { ["managedBy"] = "This app was not created by this caller." } }, options, statusCode: StatusCodes.Status409Conflict);
+                case ClientRemoval.NotFound:
+                    return NotFound(clientId);
+                case ClientRemoval.OtherMark:
+                    return Results.Json(new { errors = new Dictionary<string, string> { ["managedBy"] = "This app was not created by this caller." } }, options, statusCode: StatusCodes.Status409Conflict);
             }
 
-            await clients.DeleteAsync(clientId, ct);
             await activity.WriteAsync(ActivityKind.ClientDeleted, username: http.Items[ApiAccess.CallerKey] as string, clientId: clientId,
                 ipAddress: http.Connection.RemoteIpAddress?.ToString(), detail: "Through the API", ct: ct);
             return Results.NoContent();

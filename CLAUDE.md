@@ -8,7 +8,8 @@ interfaces or major data flow change.
 The **OpenID Connect server** of the Mat family (single sign-on): people sign in here once, the apps let them in. Optional for every app: an app that has
 `MATIDENTITY_AUTHORITY` / `_CLIENT_ID` / `_CLIENT_SECRET` sends people here; without them it keeps its own sign-in. Apps that call each other get machine tokens
 here (client credentials, scope `app:<id>`). The contract with the apps is MatDesign's [docs/PLATFORM.md](https://github.com/Real-TTX/MatDesign/blob/main/docs/PLATFORM.md);
-MatIdentity is also the first app that implements its `/api` (the MatApiDefinition).
+MatIdentity is also the first app that implemented its `/api` (the MatApiDefinition); today it speaks contract 2 through MatPlatform and provides the capability
+`identity.oidc`: a broker (Mattiverse) binds an app with `PUT /api/bindings/identity.oidc/<app>`, an administrator connects one by hand under Connections.
 
 Stack (the same as Mattiverse): ASP.NET Core on **.NET 10**, C#, **Razor Pages** + TagHelper controls, EF Core + **SQLite**, **OpenIddict 7** (server + validation),
 plain JavaScript (no build step), Docker-first, runs as the unprivileged user `app`. Web port **2300**.
@@ -22,9 +23,12 @@ rulebook. The accent is `#a21a50` (registered in MatDesign's `AppRegistry`; `#9d
 - **Tests:** `dotnet test`: xunit. `ClientRulesTests` (rules without the site), `MigrationLockTests` (a stale EF migration lock is removed at start),
   `WebUiTests` (the source of the pages: icons of the sprite, no inline style or script, tokens only in the stylesheet), and the whole site in memory (`IdentityFactory`, a `WebApplicationFactory` on its own temp data folder, Development, key `test-key-…`):
   `OidcFlowTests` (discovery, code + PKCE end to end with the real sign-in form, single sign-on, refresh and its reuse, sign-out with and without id_token_hint, machine tokens
-  and audiences, wrong secret = 401), `PlatformApiTests` (the contract, access, configure, the client API, every page opens), `MailTests`, `AccountMailTests`, `RegistrationTests`,
+  and audiences, wrong secret = 401), `PlatformApiTests` (the contract, access, configure, the client API, every page opens), `IdentityBindingTests` (the capability
+  `identity.oidc`: the definition is valid, a binding is a client with every address, the back-channel at the internal address, the roles of the app's `/api`, a secret
+  once and renewed, the list, removal only with the mark, the Connections area by hand), `MailTests`, `AccountMailTests`, `RegistrationTests`,
   `BackchannelLogoutTests`, `LockoutTests`, `AuditTests`, `ExportTests`. The site runs with `MATSMTP_*` and a public address; its mail and back-channel requests are recorded
-  (`RecordingMailTransport`, `RecordingHttpHandler`), nothing leaves the test. The site tests share one collection (environment variables).
+  (`RecordingMailTransport`, `RecordingHttpHandler`), and the apps it reads roles from answer from `IdentityFactory.AppDefinitions` (`AppDefinitionHandler`): nothing leaves
+  the test. The site tests share one collection (environment variables).
 - **Run / test the app: always rebuild the container and redeploy the stack** (project rule): `./scripts/redeploy.ps1` (`-Fresh` wipes the volume and with it the token keys,
   `-Port` changes the host port). Dev stack: `docker-compose.dev.yml` (app + `sqlite-web` on 2309, subnet `10.253.24.0/24` because the PC has its Docker address pools used up).
   In `Development` the account `admin@example.com` / `Start12345` exists and `MAT_API_KEY` is `dev-key`.
@@ -46,15 +50,18 @@ src/MatIdentity.Core       domain, no web types
                              AccountTokenService + AccountMailService (reset, invitation, verification, registration), PasswordPolicy
   Mail/                      MailService (MatSMTP or own SMTP), MailKit transport, MailQueue, MailTemplates
   Access/                    PermissionService (who may sign in where, with which role; app roles; which apps an app may call), GroupService
-  Clients/                   ClientModels (ClientInfo, ClientRules), ClientService (the apps over OpenIddict, their scopes app:<id>), TokenRevoker
+  Clients/                   ClientModels (ClientInfo, ClientRules, ClientUpsert), ClientService (the apps over OpenIddict, their scopes app:<id>; UpsertAsync and
+                             RemoveManagedAsync: the one way of /api/v1/clients and of the bindings of identity.oidc), TokenRevoker
   Activity/                  ActivityService (the activity list, 90 days)
   Configuration/             options, AppPaths, JsonConfigStore, SystemConfig(+Service: the settings and their rules), ConfigurationExport (JSON without secrets)
 src/MatIdentity.Web        Razor Pages, controls, endpoints, Program.cs (OpenIddict, cookie, rate limits, forwarded headers)
   Infrastructure/            OidcEndpoints (authorize, token, userinfo, logout), BackchannelLogout (logout tokens to the apps), LocalUrl, SignInFlow (the end of every sign-in, the second step), PasskeyEndpoints (WebAuthn), TokenKeys, ApiAccess (X-Api-Key or token for app:matidentity),
-                             ClientApiEndpoints (/api/v1/clients for Mattiverse), RateLimits, session validation, setup and password guards, health check
-  MatPlatform/               a copy of MatDesign's MatPlatform 1.5.0 (tools/matplatform-copy.js; never edit here): MatSmtpSettings, MatFrameAncestors (MAT_FRAME_ANCESTORS, registered in Program.cs)
-  Platform/                  MatApiDefinition (the contract's types), PlatformEndpoints (/api, health, state, configure, actions), IdentityPlatform (MatIdentity's part)
-  Pages/                     Index (your apps; figures for an administrator), Apps/ (Edit, Access), Users/ (People), Groups/, Activity/, Settings/, Account/ (Login, TwoFactor,
+                             IdentityBearerHandler (the scheme MatPlatform asks for a token: the same check), ClientApiEndpoints (/api/v1/clients: Mattiverse's own client), RateLimits, session validation, setup and password guards, health check
+  MatPlatform/               a copy of MatDesign's MatPlatform 2.2.0 (tools/matplatform-copy.js; never edit here): AddMatPlatform/MapMatPlatform in Program.cs (/api, health, state, configure,
+                             actions, /api/bindings, /api/connections, the form of <mat-connections />), MatSmtpSettings, MatFrameAncestors (MAT_FRAME_ANCESTORS)
+  Platform/                  IdentityPlatform (MatIdentity's description: provides identity.oidc, consumes mail.smtp; its values), IdentityBindings (IMatBindingHandler of identity.oidc:
+                             a binding is a client, listed when it has a managedBy), AppRolesReader (the roles of an app's /api)
+  Pages/                     Index (your apps; figures for an administrator), Apps/ (Edit, Access), Users/ (People), Groups/, Activity/, Connections/ (<mat-connections />), Settings/, Account/ (Login, TwoFactor,
                              NoAccess, Logout, Forgot, Reset, Verify, Register, Profile: general, password, devices; Security: authenticator app, recovery codes, passkeys), Setup, StatusCode (also the errors of the protocol), Error
   Support/ Controls/         Ui (icons, logo, app letters and hues), Navigation, Crumbs, Format, Authority, Toolkit; tag helpers (mat-field, icon, tab-bar), ListModels
   wwwroot/                   matui/ (the toolkit, a copy), css/matidentity.css (mi-* only), js/matidentity.js, img/ (logo, favicon, PWA icons), manifest
@@ -73,7 +80,9 @@ tests/MatIdentity.Tests     unit tests + the site in memory
 - The sign-in limit (20 attempts a minute per address) counts POSTs only; `MatIdentity__RateLimits__SignIn` changes it (the tests raise it).
 - Whatever ends a person's access ends it everywhere: sessions here (`SessionService.InvalidateAllAsync`) **and** the refresh tokens of the apps (`TokenRevoker`).
 - The page and the API share their rules (`ClientRules`, `SystemConfigService`): never check a value only in one of them.
-- `/api/v1/clients`: `managedBy` marks what a caller created; a caller deletes only what carries its own mark.
+- `/api/v1/clients`: `managedBy` marks what a caller created; a caller deletes only what carries its own mark. The bindings of `identity.oidc` go the same way
+  (`ClientService.UpsertAsync`, `RemoveManagedAsync`): never a second way to make or remove a client. `manual` (`ClientRules.ManagedByHand`) is an app connected by hand
+  in the Connections area; only it may be without sign-in addresses (they are added under Apps).
 
 **Database**
 - JSON for configuration, SQLite for logic. Tables PascalCase and singular, key `Id` (64 bit), `CreateDate`, `CreateUserId`, `UpdateDate`, `UpdateUserId`, `UpdateState`

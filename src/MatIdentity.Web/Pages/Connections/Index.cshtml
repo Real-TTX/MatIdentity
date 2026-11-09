@@ -1,0 +1,16 @@
+@page
+@model MatIdentity.Web.Pages.Connections.IndexModel
+@{
+    ViewData["Title"] = "Connections";
+    ViewData["PageSub"] = "What MatIdentity does for the other apps, and what it uses of them.";
+    ViewData["Crumbs"] = Crumbs.Of(("Connections", null));
+}
+
+<div class="mat-stack">
+    <p class="mat-muted">
+        The apps Mattiverse connects, and those you connect here, sign people in through MatIdentity (<code>identity.oidc</code>). For an app without Mattiverse, connect it
+        here by hand: it gets its id and secret at once, shown only once. Then add its sign-in addresses under <a href="/Apps">Apps</a>. Apps added under Apps are not listed here.
+    </p>
+
+    <mat-connections />
+</div>

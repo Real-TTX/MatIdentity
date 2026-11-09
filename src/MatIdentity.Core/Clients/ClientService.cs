@@ -164,6 +164,84 @@ public sealed class ClientService
         return new ClientSaveResult(await GetAsync(client.ClientId, ct), secret, new Dictionary<string, string>());
     }
 
+    /// <summary>
+    /// Creates or changes an app as a caller registers it (<see cref="ClientUpsert"/>): what is given, the rest kept. Its rules come first (saving the app writes the scopes
+    /// it may ask for from them); the id and the roles are checked before anything is saved. The one way of <c>/api/v1/clients</c> and of the bindings of <c>identity.oidc</c>.
+    /// </summary>
+    public async Task<ClientUpsertResult> UpsertAsync(ClientUpsert upsert, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(upsert);
+        var errors = CheckUpsert(upsert);
+        if (errors.Count > 0)
+        {
+            return new ClientUpsertResult(new ClientSaveResult(null, null, errors), Created: false);
+        }
+
+        var clientId = upsert.ClientId;
+        var existing = await GetAsync(clientId, ct);
+        var policy = await _permissions.PolicyAsync(clientId, ct);
+        await _permissions.SavePolicyAsync(clientId, upsert.RoleMode ?? policy.RoleMode, upsert.OpenToEveryone ?? policy.OpenToEveryone, upsert.CallsAllApps ?? policy.CallsAllApps, ct);
+        if (upsert.Roles is not null)
+        {
+            await _permissions.SaveRolesAsync(clientId, upsert.Roles, ct);
+        }
+
+        // The apps it may call by name (also MatIdentity's own API, which "every app" leaves out).
+        if (upsert.CallTargets is not null)
+        {
+            await _permissions.SetCallTargetsAsync(clientId, upsert.CallTargets.Where(ClientRules.IsValidClientId).Distinct(StringComparer.Ordinal), ct);
+        }
+
+        var saved = await SaveAsync(new ClientInfo
+        {
+            ClientId = clientId,
+            DisplayName = upsert.DisplayName ?? existing?.DisplayName ?? clientId,
+            HomeUrl = upsert.HomeUrl ?? existing?.HomeUrl,
+            AllowSignIn = upsert.AllowSignIn ?? existing?.AllowSignIn ?? true,
+            AllowMachine = upsert.AllowMachine ?? existing?.AllowMachine ?? false,
+            IsPublic = upsert.IsPublic ?? existing?.IsPublic ?? false,
+            RedirectUris = upsert.RedirectUris ?? existing?.RedirectUris ?? [],
+            PostLogoutRedirectUris = upsert.PostLogoutRedirectUris ?? existing?.PostLogoutRedirectUris ?? [],
+            BackchannelLogoutUri = upsert.BackchannelLogoutUri ?? existing?.BackchannelLogoutUri,
+            ManagedBy = upsert.ManagedBy ?? existing?.ManagedBy,
+        }, upsert.RenewSecret, ct);
+        return new ClientUpsertResult(saved, Created: existing is null && saved.Succeeded);
+    }
+
+    /// <summary>What <see cref="UpsertAsync"/> checks before it saves anything: the id and the roles (the field, camelCase, and a message).</summary>
+    public static Dictionary<string, string> CheckUpsert(ClientUpsert upsert)
+    {
+        ArgumentNullException.ThrowIfNull(upsert);
+        var errors = upsert.Roles is null ? new Dictionary<string, string>() : PermissionService.ValidateRoles(upsert.Roles);
+        if (!ClientRules.IsValidClientId(upsert.ClientId))
+        {
+            errors["clientId"] = "Use 2 to 63 small letters, digits, - or _, starting with a letter or digit.";
+        }
+
+        return errors;
+    }
+
+    /// <summary>
+    /// Removes an app a caller registered, only when it carries the caller's mark: <paramref name="managedBy"/> "" stands for no mark (an app added under Apps), null for
+    /// any mark. Never deletes what another caller created. The one way of <c>DELETE /api/v1/clients</c> and of the bindings of <c>identity.oidc</c>.
+    /// </summary>
+    public async Task<ClientRemoval> RemoveManagedAsync(string clientId, string? managedBy, CancellationToken ct = default)
+    {
+        var existing = await GetAsync(clientId, ct);
+        if (existing is null)
+        {
+            return ClientRemoval.NotFound;
+        }
+
+        if (managedBy is not null && !string.Equals(existing.ManagedBy ?? string.Empty, managedBy, StringComparison.Ordinal))
+        {
+            return ClientRemoval.OtherMark;
+        }
+
+        await DeleteAsync(clientId, ct);
+        return ClientRemoval.Removed;
+    }
+
     /// <summary>Makes a new secret for a confidential app (the old one stops working at once). Null for an unknown or public app.</summary>
     public async Task<string?> RenewSecretAsync(string clientId, CancellationToken ct = default)
     {

@@ -42,7 +42,11 @@
                         <tr>
                             <td data-label="App">
                                 <div class="mat-table__name"><a href="/Apps/Edit?id=@c.ClientId">@c.DisplayName</a></div>
-                                @if (c.ManagedBy is not null)
+                                @if (c.ManagedBy == MatIdentity.Core.Clients.ClientRules.ManagedByHand)
+                                {
+                                    <span class="mat-tag">Connected by hand</span>
+                                }
+                                else if (c.ManagedBy is not null)
                                 {
                                     <span class="mat-tag">Managed by @c.ManagedBy</span>
                                 }

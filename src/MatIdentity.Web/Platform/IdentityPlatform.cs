@@ -9,17 +9,22 @@ using MatIdentity.Core.Entities;
 using MatIdentity.Core.Mail;
 using MatIdentity.Core.Users;
 using MatIdentity.Web.Support;
+using MatPlatform;
 
 namespace MatIdentity.Web.Platform;
 
 /// <summary>
-/// MatIdentity as an app of the platform contract: how Mattiverse shows it (tiles, settings, buttons), what its values are and what the
-/// buttons do. The settings are the same as on the Settings page, checked by the same <see cref="SystemConfigService"/>.
+/// MatIdentity as an app of the platform contract (MatPlatform, <c>AddMatPlatform</c> in Program.cs): how Mattiverse shows it (tiles, settings, buttons), what it provides
+/// (<c>identity.oidc</c>: an OpenID Connect client per app, <see cref="IdentityBindings"/>) and consumes (<c>mail.smtp</c>), what its values are and what the buttons do.
+/// The settings are the same as on the Settings page, checked by the same <see cref="SystemConfigService"/> (<c>MatPlatformOptions.CheckValues</c> is off).
 /// </summary>
-public sealed class IdentityPlatform : IMatPlatformApp
+public sealed class IdentityPlatform : IMatPlatformState, IMatPlatformConfiguration, IMatPlatformActions, IMatPlatformHealth
 {
     private static readonly ActivityKind[] SignIns = [ActivityKind.SignIn];
     private static readonly ActivityKind[] Failures = [ActivityKind.SignInFailed];
+
+    /// <summary>The settings of the own SMTP server; fixed when MatSMTP is set.</summary>
+    private static readonly string[] MailKeys = ["smtpHost", "smtpPort", "smtpTls", "smtpFrom", "smtpUsername", "smtpPassword"];
 
     private readonly DatabaseService _database;
     private readonly UserService _users;
@@ -27,11 +32,10 @@ public sealed class IdentityPlatform : IMatPlatformApp
     private readonly SessionService _sessions;
     private readonly ActivityService _activity;
     private readonly SystemConfigService _config;
-    private readonly ApiAccess _access;
     private readonly TokenRevoker _revoker;
     private readonly MailService _mail;
 
-    public IdentityPlatform(DatabaseService database, UserService users, ClientService clients, SessionService sessions, ActivityService activity, SystemConfigService config, ApiAccess access, TokenRevoker revoker, MailService mail)
+    public IdentityPlatform(DatabaseService database, UserService users, ClientService clients, SessionService sessions, ActivityService activity, SystemConfigService config, TokenRevoker revoker, MailService mail)
     {
         _mail = mail;
         _revoker = revoker;
@@ -41,109 +45,99 @@ public sealed class IdentityPlatform : IMatPlatformApp
         _sessions = sessions;
         _activity = activity;
         _config = config;
-        _access = access;
     }
 
-    public MatApiDefinition Definition(HttpContext http) => new()
+    /// <summary>
+    /// The definition of <c>GET /api</c>. MatIdentity speaks English; only the words of its capabilities follow the caller's language (<see cref="MatPlatformBuilder.T"/>).
+    /// <paramref name="smtp"/>: the <c>MATSMTP_*</c> variables, which fix the mail settings.
+    /// </summary>
+    public static void Describe(MatPlatformBuilder o, MatSmtpSettings smtp)
     {
-        App = new MatAppInfo(Ui.App.Id, Ui.App.Name, Ui.App.Tagline, AppVersion.Current, "/img/logo.svg", Ui.App.Accent),
-        // MatIdentity is the identity: its own address is the authority.
-        Auth = new MatAuthInfo(_access.KeyEnabled, $"{http.Request.Scheme}://{http.Request.Host}{http.Request.PathBase}"),
-        Pages =
-        [
-            new MatPage("overview", "Overview", "dashboard",
-            [
-                new MatSection("tiles", ["users", "apps", "sessions", "signInsToday", "failedToday", "lastSignIn"]),
-                new MatSection("actions", ["openAdmin", "openApps", "signOutEveryone"]),
-            ]),
-            new MatPage("settings", "Settings", "settings",
-            [
-                new MatSection("form", ["instanceName", "issuer"], Label: "General"),
-                new MatSection("form", ["sessionLifetimeDays", "accessTokenMinutes", "passwordMinLength", "allowRegistration"], Label: "Sign-in"),
-                new MatSection("form", MailKeys, Label: "Mail"),
-            ]),
-        ],
-        State =
-        [
-            new MatStateItem("users", "People", "number") { Icon = "users" },
-            new MatStateItem("apps", "Apps", "number") { Icon = "apps" },
-            new MatStateItem("sessions", "Signed in now", "number") { Icon = "key" },
-            new MatStateItem("signInsToday", "Sign-ins in 24 h", "number") { Icon = "login" },
-            new MatStateItem("failedToday", "Failed sign-ins in 24 h", "number") { Icon = "alert", WarnAbove = 10, ErrorAbove = 50 },
-            new MatStateItem("lastSignIn", "Last sign-in", "time"),
-        ],
-        Configure =
-        [
-            new MatField("instanceName", "Name", "text") { Required = true, Max = 80, Hint = "Shown on the sign-in page and in the menu." },
-            new MatField("issuer", "Public address", "url")
+        ArgumentNullException.ThrowIfNull(o);
+        ArgumentNullException.ThrowIfNull(smtp);
+
+        o.App(Ui.App.Id, Ui.App.Name, Ui.App.Tagline, AppVersion.Current, "/img/logo.svg", Ui.App.Accent);
+        o.Page("overview", "Overview", "dashboard",
+            MatSection.Tiles("users", "apps", "sessions", "signInsToday", "failedToday", "lastSignIn"),
+            MatSection.Actions("openAdmin", "openApps", "signOutEveryone"));
+        o.Page("settings", "Settings", "settings",
+            MatSection.Form("General", "instanceName", "issuer"),
+            MatSection.Form("Sign-in", "sessionLifetimeDays", "accessTokenMinutes", "passwordMinLength", "allowRegistration"),
+            MatSection.Form("Mail", MailKeys));
+
+        o.Tile(new MatStateItem("users", "People", "number") { Icon = "users" })
+            .Tile(new MatStateItem("apps", "Apps", "number") { Icon = "apps" })
+            .Tile(new MatStateItem("sessions", "Signed in now", "number") { Icon = "key" })
+            .Tile(new MatStateItem("signInsToday", "Sign-ins in 24 h", "number") { Icon = "login" })
+            .Tile(new MatStateItem("failedToday", "Failed sign-ins in 24 h", "number") { Icon = "alert", WarnAbove = 10, ErrorAbove = 50 })
+            .Tile(new MatStateItem("lastSignIn", "Last sign-in", "time"));
+
+        o.Field(new MatField("instanceName", "Name", "text") { Required = true, Max = 80, Hint = "Shown on the sign-in page and in the menu." })
+            .Field(new MatField("issuer", "Public address", "url")
             {
                 Placeholder = "https://id.example.com",
                 Hint = "The address the apps reach MatIdentity at. Empty: the address of each request.",
                 Restart = true,
-            },
-            new MatField("sessionLifetimeDays", "Stay signed in (days)", "number")
+            })
+            .Field(new MatField("sessionLifetimeDays", "Stay signed in (days)", "number")
             {
                 Required = true, Min = SystemConfigService.MinSessionDays, Max = SystemConfigService.MaxSessionDays,
                 Hint = "Without activity a person has to sign in again after this many days.",
-            },
-            new MatField("accessTokenMinutes", "Access token (minutes)", "number")
+            })
+            .Field(new MatField("accessTokenMinutes", "Access token (minutes)", "number")
             {
                 Required = true, Min = SystemConfigService.MinTokenMinutes, Max = SystemConfigService.MaxTokenMinutes,
                 Hint = "Short is safer; the apps renew it on their own.", Restart = true,
-            },
-            new MatField("passwordMinLength", "Shortest password", "number")
+            })
+            .Field(new MatField("passwordMinLength", "Shortest password", "number")
             {
-                Required = true, Min = MatIdentity.Core.Users.PasswordPolicy.Floor, Max = MatIdentity.Core.Users.PasswordPolicy.Ceiling,
+                Required = true, Min = PasswordPolicy.Floor, Max = PasswordPolicy.Ceiling,
                 Hint = "For new passwords.",
-            },
-            new MatField("allowRegistration", "People may create their own account", "bool") { Hint = "Needs mail and the public address; the account works after the address is confirmed." },
-            .. MailFields(),
-        ],
-        Actions =
-        [
-            new MatAction("openAdmin", "Open MatIdentity", "external", "link") { Url = "/" },
-            new MatAction("openApps", "Manage apps", "apps", "link") { Url = "/Apps" },
-            new MatAction("signOutEveryone", "Sign everyone out", "logout", "post")
-            {
-                Confirm = "Sign everyone out? Every person has to sign in again, in every app.",
-                Danger = true,
-            },
-        ],
-        Provides = [new MatCapability("identity.oidc", 1)],
-        Endpoints = ["/api/health", "/api/state", "/api/configure", "/api/actions", "/api/v1/clients"],
-    };
+            })
+            .Field(new MatField("allowRegistration", "People may create their own account", "bool") { Hint = "Needs mail and the public address; the account works after the address is confirmed." });
+        foreach (var field in MailFields())
+        {
+            // With MatSMTP the mail goes there: shown, not changeable (PUT /api/configure refuses it).
+            o.Field(smtp.Fix(field, "en"));
+        }
 
-    /// <summary>The settings of the own SMTP server; fixed when MatSMTP is set.</summary>
-    private static readonly string[] MailKeys = ["smtpHost", "smtpPort", "smtpTls", "smtpFrom", "smtpUsername", "smtpPassword"];
+        o.LinkAction("openAdmin", "Open MatIdentity", "external", "/")
+            .LinkAction("openApps", "Manage apps", "apps", "/Apps")
+            .PostAction("signOutEveryone", "Sign everyone out", "logout", "Sign everyone out? Every person has to sign in again, in every app.", danger: true);
 
-    private IEnumerable<MatField> MailFields()
-    {
-        MatField[] fields =
-        [
-            new MatField("smtpHost", "SMTP server", "text") { Placeholder = "smtp.example.com", Hint = "For password resets, invitations and confirming e-mail addresses. Empty: no mail." },
-            new MatField("smtpPort", "Port", "number") { Min = 1, Max = 65535 },
-            new MatField("smtpTls", "Security", "select") { Options = [new("starttls", "STARTTLS (587)"), new("tls", "TLS (465)"), new("none", "None")] },
-            new MatField("smtpFrom", "Sender", "email") { Placeholder = "id@example.com" },
-            new MatField("smtpUsername", "User", "text"),
-            new MatField("smtpPassword", "Password", "secret") { Hint = "Never sent back; empty keeps it." },
-        ];
-        return _mail.Relay.IsConfigured ? fields.Select(f => f with { Fixed = true, Hint = _mail.Relay.Description }) : fields;
+        // A binding of identity.oidc is an OpenID Connect client of the consumer (IdentityBindings); the mail goes through MatSMTP when it is bound.
+        o.Provides(MatCapabilities.IdentityOidc, label: o.T("Meldet Personen an für", "Signs people in for"))
+            .Consumes(MatCapabilities.MailSmtp, optional: true);
     }
 
-    public async Task<MatHealth> HealthAsync(CancellationToken ct)
+    private static MatField[] MailFields() =>
+    [
+        new MatField("smtpHost", "SMTP server", "text") { Placeholder = "smtp.example.com", Hint = "For password resets, invitations and confirming e-mail addresses. Empty: no mail." },
+        new MatField("smtpPort", "Port", "number") { Min = 1, Max = 65535 },
+        new MatField("smtpTls", "Security", "select") { Options = [new("starttls", "STARTTLS (587)"), new("tls", "TLS (465)"), new("none", "None")] },
+        new MatField("smtpFrom", "Sender", "email") { Placeholder = "id@example.com" },
+        new MatField("smtpUsername", "User", "text"),
+        new MatField("smtpPassword", "Password", "secret") { Hint = "Never sent back; empty keeps it." },
+    ];
+
+    public async Task<IReadOnlyList<MatHealthCheck>> CheckHealthAsync(MatPlatformCall call, CancellationToken ct)
     {
-        var checks = new List<MatHealthCheck>();
-        checks.Add(await _database.CanReadAsync(ct) ? new MatHealthCheck("database", "ok") : new MatHealthCheck("database", "down", "The database cannot be read."));
+        var checks = new List<MatHealthCheck>
+        {
+            await _database.CanReadAsync(ct) ? new MatHealthCheck("database", "ok") : new MatHealthCheck("database", "down", "The database cannot be read."),
+        };
 
         if (await _users.CountActiveAdminsAsync(ct) == 0 && await _users.CountAsync(ct) > 0)
         {
             checks.Add(new MatHealthCheck("administrators", "degraded", "No active administrator."));
         }
 
-        var status = checks.Any(c => c.Status == "down") ? "down" : checks.Any(c => c.Status == "degraded") ? "degraded" : "ok";
-        return new MatHealth(status, Ui.App.Id, AppVersion.Current, DateTimeOffset.Now, checks);
+        return checks;
     }
 
+    public Task<IReadOnlyDictionary<string, MatStateValue>> GetStateAsync(MatPlatformCall call, CancellationToken ct) => StateAsync(ct);
+
+    /// <summary>The values of the tiles (also the figures of the start page).</summary>
     public async Task<IReadOnlyDictionary<string, MatStateValue>> StateAsync(CancellationToken ct)
     {
         var day = DateTime.UtcNow.AddDays(-1);
@@ -160,7 +154,7 @@ public sealed class IdentityPlatform : IMatPlatformApp
         };
     }
 
-    public async Task<IReadOnlyDictionary<string, object?>> ConfigurationAsync(CancellationToken ct)
+    public async Task<IReadOnlyDictionary<string, object?>> GetConfigurationAsync(MatPlatformCall call, CancellationToken ct)
     {
         var config = await _config.GetAsync(ct);
         return new Dictionary<string, object?>
@@ -176,13 +170,16 @@ public sealed class IdentityPlatform : IMatPlatformApp
             ["smtpTls"] = _mail.Relay.Target is { } relay ? SmtpTarget.Name(relay.Tls) : config.SmtpTls,
             ["smtpFrom"] = _mail.Relay.Target?.From ?? config.SmtpFrom,
             ["smtpUsername"] = _mail.Relay.Target is { } fixedTarget ? fixedTarget.Username : config.SmtpUsername,
-            // A secret is never sent back.
-            ["smtpPassword"] = null,
+            // A secret is never sent back: only whether it is set.
+            ["smtpPassword"] = MatSecret.Of(_mail.Relay.Target is { } withPassword ? withPassword.Password : config.SmtpPasswordProtected),
         };
     }
 
-    public async Task<IReadOnlyDictionary<string, string>> ConfigureAsync(IReadOnlyDictionary<string, JsonElement> values, string caller, CancellationToken ct)
+    public async Task<IReadOnlyDictionary<string, string>> ConfigureAsync(IReadOnlyDictionary<string, JsonElement> values, MatPlatformCall call, CancellationToken ct)
     {
+        ArgumentNullException.ThrowIfNull(values);
+        ArgumentNullException.ThrowIfNull(call);
+        var caller = call.Caller;
         var config = await _config.GetAsync(ct);
         var errors = new Dictionary<string, string>();
         foreach (var (key, value) in values)
@@ -269,14 +266,15 @@ public sealed class IdentityPlatform : IMatPlatformApp
         return saveErrors;
     }
 
-    public async Task<(bool Ok, string Message)?> RunActionAsync(string id, string caller, CancellationToken ct)
+    public async Task<MatActionResult?> RunActionAsync(string id, MatPlatformCall call, CancellationToken ct)
     {
+        ArgumentNullException.ThrowIfNull(call);
         switch (id)
         {
             case "signOutEveryone":
                 var (sessions, tokens) = await SignOutEveryoneAsync(_sessions, _revoker, ct);
-                await _activity.WriteAsync(ActivityKind.EveryoneSignedOut, username: caller, detail: $"({sessions} sessions, {tokens} app sign-ins)", ct: ct);
-                return (true, $"{sessions} sessions and {tokens} app sign-ins ended.");
+                await _activity.WriteAsync(ActivityKind.EveryoneSignedOut, username: call.Caller, detail: $"({sessions} sessions, {tokens} app sign-ins)", ct: ct);
+                return new MatActionResult(true, $"{sessions} sessions and {tokens} app sign-ins ended.");
             default:
                 return null;
         }

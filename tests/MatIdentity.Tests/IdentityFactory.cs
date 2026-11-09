@@ -44,12 +44,16 @@ public sealed class IdentityFactory : WebApplicationFactory<Program>
     /// <summary>Every back-channel logout the site sent (address, form).</summary>
     public System.Collections.Concurrent.ConcurrentQueue<(Uri Address, Dictionary<string, string> Form)> Backchannel { get; } = new();
 
+    /// <summary>The definitions (<c>GET &lt;app&gt;/api</c>) of the apps MatIdentity reads roles from, by the address of the definition; any other address answers 404.</summary>
+    public System.Collections.Concurrent.ConcurrentDictionary<string, string> AppDefinitions { get; } = new(StringComparer.OrdinalIgnoreCase);
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
         => builder.UseEnvironment("Development")
             .ConfigureTestServices(services =>
             {
                 services.AddSingleton<IMailTransport>(Mails);
                 services.AddHttpClient(BackchannelLogoutWorker.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => new RecordingHttpHandler(Backchannel));
+                services.AddHttpClient(nameof(MatIdentity.Web.Platform.AppRolesReader)).ConfigurePrimaryHttpMessageHandler(() => new AppDefinitionHandler(AppDefinitions));
             });
 
     /// <summary>A client that keeps cookies and does not follow redirects (the tests look at each step).</summary>

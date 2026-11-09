@@ -55,6 +55,17 @@ public sealed class PermissionService
         await _db.SaveChangesAsync(ct);
     }
 
+    /// <summary>
+    /// When the rules of each of these apps were written first, which is when the app was registered (the API, a binding and the page write them before the app);
+    /// an app without rules is missing.
+    /// </summary>
+    public Task<Dictionary<string, DateTime>> RegisteredAsync(IReadOnlyCollection<string> clientIds, CancellationToken ct = default)
+        => _db.AppPolicies.AsNoTracking()
+            .Where(p => clientIds.Contains(p.ClientId))
+            .GroupBy(p => p.ClientId)
+            .Select(g => new { ClientId = g.Key, First = g.Min(p => p.CreateDate) })
+            .ToDictionaryAsync(g => g.ClientId, g => g.First, ct);
+
     /// <summary>The roles of an app, the most powerful first; <see cref="DefaultRoles"/> when it has none.</summary>
     public async Task<IReadOnlyList<RoleInfo>> RolesAsync(string clientId, CancellationToken ct = default)
     {

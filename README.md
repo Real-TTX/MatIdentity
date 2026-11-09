@@ -55,7 +55,8 @@ registers every app it installs here and gives it its sign-in.
 - **Which apps an app may call** (machine tokens): all, or the ones chosen
 
 **Apps**
-- Add an app in the UI, or let **Mattiverse** add it when it installs one (`/api/v1/clients`, marked *Managed by mattiverse*)
+- Add an app in the UI, or let **Mattiverse** connect it when it installs one (the capability `identity.oidc`: `/api/bindings`, marked *Managed by mattiverse*),
+  or connect it by hand under **Connections** (without Mattiverse)
 - The **secret is shown once** with the variables the app needs, ready to copy; MatIdentity keeps only its hash
 - **Apps calling apps**: an app with *calls other apps* gets a token for `app:<id>` (client credentials) whose audience is the other app
 
@@ -69,6 +70,8 @@ registers every app it installs here and gives it its sign-in.
 
 **The Mat platform**
 - `/api` describes MatIdentity (the **MatApiDefinition**: tiles, settings, buttons), `/api/health`, `/api/state`, `/api/configure`, `/api/actions/{id}`, so Mattiverse shows and configures it without knowing it
+- It **provides the capability `identity.oidc`**: a broker binds an app with `PUT /api/bindings/identity.oidc/<app>` and gets its `MATIDENTITY_*` variables; the
+  **Connections** page shows the connected apps (new secret, remove) and connects one by hand
 - Built on **MatUi** of [MatDesign](https://github.com/Real-TTX/MatDesign): the same menu, lists, forms and dark mode as every Mat app
 
 ## Screenshots
@@ -241,8 +244,9 @@ an app checks that the issuer of a token is the address it knows.
 ### 3. With Mattiverse
 
 Install **MatIdentity** from the store of Mattiverse (or tick it in the setup wizard). Mattiverse sets the public address, registers itself and
-every app that can use it (MatSplit, MatTrakr, MatPaper, MatFile, Matdo, MatPlay, MatBu, MatDock, Matcad, Matddns …), fills in their `MATIDENTITY_*`
-variables and redeploys them. When MatIdentity goes, the apps go back to their own sign-in. Who may open which app is set here, in MatIdentity.
+binds every app that can use it (MatSplit, MatTrakr, MatPaper, MatFile, Matdo, MatPlay, MatBu, MatDock, Matcad, Matddns …: every app whose `/api` consumes
+`identity.oidc`), fills in their `MATIDENTITY_*` variables and redeploys them. When MatIdentity goes, the apps go back to their own sign-in. Who may open which
+app is set here, in MatIdentity.
 
 ### 4. From source
 
@@ -264,6 +268,12 @@ MATIDENTITY_CLIENT_SECRET=...
 
 Then, in *Access*, give the app to the people or groups who may open it. Any other app that speaks OpenID Connect finds everything at
 `https://id.example.com/.well-known/openid-configuration` (scopes `openid profile email roles offline_access`).
+
+**A Mat app without Mattiverse** (the platform contract's way, the same for every capability): *Connections → Connect an app by hand*, type its name
+(`MatDrive`). MatIdentity makes the client (id `matdrive`, marked *Connected by hand*) and shows `MATIDENTITY_AUTHORITY`, `MATIDENTITY_CLIENT_ID` and
+`MATIDENTITY_CLIENT_SECRET` once; set them in the app's compose file. Then open the app under *Apps* and add its sign-in addresses (`https://drive.example.com/signin-oidc`,
+after sign-out `https://drive.example.com/signout-callback-oidc`, and the back-channel address if MatIdentity reaches the app). *New key* on the Connections page
+makes a new secret (the old one stops at once) and keeps the addresses; *Remove* deletes the client.
 
 ### Settings that matter
 
@@ -291,9 +301,34 @@ MatIdentity speaks the platform contract of the Mat apps (MatDesign [docs/PLATFO
 | `GET /api/state[/key]` | The values of the tiles |
 | `GET/PUT /api/configure` | The settings Mattiverse may change |
 | `POST /api/actions/{id}` | The buttons: sign everyone out (the links open MatIdentity and its apps) |
-| `/api/v1/clients` | The apps, for Mattiverse (create, change, remove what it created); `backchannelLogoutUri` and `callTargets` are optional |
+| `GET /api/bindings` | The apps bound to `identity.oidc`: every client with a mark (`managedBy`), with since and last used. Key only |
+| `PUT /api/bindings/identity.oidc/{app}` | Bind an app: its OpenID Connect client (below), answered as its four `MATIDENTITY_*` variables. Key only |
+| `DELETE /api/bindings/identity.oidc/{app}?managedBy=` | Remove the client, only with its mark (none given: any mark; never an app without one). Key only |
+| `GET /api/connections` | What MatIdentity offers and uses, as the Connections page shows it (secrets as `{"isSet": …}`) |
+| `/api/v1/clients` | The apps (create, change, remove what the caller created): Mattiverse registers itself here; `backchannelLogoutUri` and `callTargets` are optional |
 
-Access with `X-Api-Key: <MAT_API_KEY>` or a token of MatIdentity whose audience is `app:matidentity` (an app gets that scope only by name, never through "calls every app").
+Access with `X-Api-Key: <MAT_API_KEY>` or a token of MatIdentity whose audience is `app:matidentity` (an app gets that scope only by name, never through "calls every app");
+`/api/bindings` takes the key only.
+
+**`identity.oidc`.** A broker (Mattiverse, or any program with the key) binds an app:
+
+```
+PUT /api/bindings/identity.oidc/matdrive
+{ "version": 1, "managedBy": "mattiverse",
+  "consumer": { "name": "MatDrive", "url": "https://drive.example.com", "urls": ["https://drive.example.com", "http://nas:4810"],
+                "internalUrl": "http://mattiverse-matdrive-web:4810" },
+  "provider": { "url": "https://id.example.com", "internalUrl": "http://mattiverse-matidentity-matidentity:2300" },
+  "params": {}, "renew": false }
+
+200 { "variables": { "MATIDENTITY_AUTHORITY": "https://id.example.com", "MATIDENTITY_INTERNAL_URL": "http://mattiverse-matidentity-matidentity:2300",
+                     "MATIDENTITY_CLIENT_ID": "matdrive", "MATIDENTITY_CLIENT_SECRET": "…" } }
+```
+
+The client: id `matdrive` (`-app` added to a one-letter id), its name, the sign-in address `<address>/signin-oidc` and the address after sign-out
+`<address>/signout-callback-oidc` for **every** address of the app, the back-channel logout at its internal address (`/signout-backchannel`), and the roles its own
+`/api` names. The parameters `callback`, `signedOut` and `backchannel` change the paths (`backchannel: ""`: none). The secret goes out once: when the client is
+new or with `"renew": true` (the old one stops at once); otherwise `{"isSet": true}`. The authority is MatIdentity's public address; without one, the address the
+broker names.
 
 The apps use the shared .NET package **MatPlatform** of MatDesign for their side: the endpoints, the sign-in through MatIdentity (auto-login, `?local=1`
 for the local form, sign-out at MatIdentity, the scheme behind a TLS proxy) and the rule for existing accounts: an account of the app that has the
@@ -343,7 +378,8 @@ platform key is `dev-key`.
 | OpenID Connect server (code + PKCE, refresh, client credentials, user info, end session) | ✅ |
 | People, sessions, devices, activity, sign everyone out | ✅ |
 | Apps in the UI and through the API for Mattiverse | ✅ |
-| The platform contract (`/api`, health, state, configure, actions) | ✅ |
+| The platform contract (`/api`, health, state, configure, actions) | ✅ contract 2, MatPlatform 2.1 |
+| The capability `identity.oidc` (`/api/bindings`), the Connections page, connecting an app by hand | ✅ |
 | Authenticator app (TOTP), recovery codes, passkeys (passwordless and as second step) | ✅ |
 | Groups, access and roles per app, which apps an app may call | ✅ |
 | Mail (MatSMTP or own SMTP): password reset, invitations, e-mail verification, self-registration | ✅ |

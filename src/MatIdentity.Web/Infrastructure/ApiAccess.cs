@@ -40,16 +40,22 @@ public sealed class ApiAccess
             }
         }
 
-        if (http.Request.Headers.Authorization.ToString().StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        return await TokenAsync(http) is { } principal ? principal.GetClaim(OpenIddictConstants.Claims.Subject) ?? "token" : null;
+    }
+
+    /// <summary>
+    /// A token of MatIdentity for its own API (audience <c>matidentity</c>), checked by its own validation; null without a valid one. The protected part of <c>/api</c>
+    /// (MatPlatform, <see cref="IdentityBearerHandler"/>) and <c>/api/v1</c> check the same.
+    /// </summary>
+    public static async Task<System.Security.Claims.ClaimsPrincipal?> TokenAsync(HttpContext http)
+    {
+        if (!http.Request.Headers.Authorization.ToString().StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
         {
-            var result = await http.AuthenticateAsync(OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme);
-            if (result.Succeeded && result.Principal.HasAudience(ClientRules.SelfId))
-            {
-                return result.Principal.GetClaim(OpenIddictConstants.Claims.Subject) ?? "token";
-            }
+            return null;
         }
 
-        return null;
+        var result = await http.AuthenticateAsync(OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme);
+        return result.Succeeded && result.Principal.HasAudience(ClientRules.SelfId) ? result.Principal : null;
     }
 
     /// <summary>An endpoint filter: <c>401</c> unless <see cref="AuthenticateAsync"/> knows the caller; the name lands in <c>HttpContext.Items</c>.</summary>

@@ -42,6 +42,14 @@ public sealed class ActivityService
     public async Task<DateTime?> LastAsync(ActivityKind kind, CancellationToken ct = default)
         => await _db.Activity.Where(a => a.Kind == kind).OrderByDescending(a => a.Id).Select(a => (DateTime?)a.CreateDate).FirstOrDefaultAsync(ct);
 
+    /// <summary>When each of these apps last got a token (a person signed in to it, or a machine token), as far as the list knows (90 days); an app without one is missing.</summary>
+    public Task<Dictionary<string, DateTime>> LastTokenAsync(IReadOnlyCollection<string> clientIds, CancellationToken ct = default)
+        => _db.Activity.AsNoTracking()
+            .Where(a => (a.Kind == ActivityKind.AppSignIn || a.Kind == ActivityKind.MachineToken) && a.ClientId != null && clientIds.Contains(a.ClientId))
+            .GroupBy(a => a.ClientId!)
+            .Select(g => new { ClientId = g.Key, Last = g.Max(a => a.CreateDate) })
+            .ToDictionaryAsync(g => g.ClientId, g => g.Last, ct);
+
     /// <summary>Removes entries older than <paramref name="days"/> days (kept small, it is no archive). Returns how many.</summary>
     public Task<int> PruneAsync(int days, CancellationToken ct = default)
     {

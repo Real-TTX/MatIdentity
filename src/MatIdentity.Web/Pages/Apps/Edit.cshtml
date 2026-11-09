@@ -36,7 +36,11 @@ else
         <tab-bar model="Model.Tabs" label="@Model.Input.DisplayName" />
     }
 
-    @if (Model.ManagedBy is not null)
+    @if (Model.ManagedBy == MatIdentity.Core.Clients.ClientRules.ManagedByHand)
+    {
+        <div class="mat-alert mat-alert--info" role="status"><icon name="info" /><div class="mat-alert__body">Connected by hand under <a href="/Connections">Connections</a>: add its sign-in addresses below.</div></div>
+    }
+    else if (Model.ManagedBy is not null)
     {
         <div class="mat-alert mat-alert--info" role="status"><icon name="info" /><div class="mat-alert__body">Managed by @Model.ManagedBy: it set this app up and changes it when it updates the app. Your changes here may be replaced.</div></div>
     }

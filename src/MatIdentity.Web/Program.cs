@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Text.Json;
 using MatIdentity.Core;
@@ -5,6 +6,8 @@ using MatIdentity.Core.Configuration;
 using MatIdentity.Core.Data;
 using MatIdentity.Core.Entities;
 using MatIdentity.Web.Platform;
+using MatPlatform;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.StaticFiles;
@@ -66,7 +69,6 @@ builder.Services.AddScoped<ICurrentUserAccessor, HttpCurrentUserAccessor>();
 builder.Services.AddSingleton<SetupState>();
 builder.Services.AddSingleton<MatIdentity.Web.Support.Toolkit>();
 builder.Services.AddSingleton<ApiAccess>();
-builder.Services.AddScoped<IMatPlatformApp, IdentityPlatform>();
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<AppRolesReader>();
 // Back-channel logout: when sessions end here, the apps with a back-channel address hear it (signed logout tokens, sent after the answer).
@@ -85,8 +87,34 @@ builder.Services.AddSingleton(new MatIdentity.Core.Mail.MailRelay
         : null,
     Description = matSmtp.Describe("en"),
 });
-// MAT_FRAME_ANCESTORS: the origins that may show MatIdentity in a frame, such as Mattiverse (MatPlatform's MatFrameAncestors; without it nothing changes).
-MatPlatform.MatFrameAncestors.AddMatFrameAncestors(builder.Services);
+
+// The platform contract (MatDesign's MatPlatform, a copy in MatPlatform/): /api with its values (IdentityPlatform), the bindings of identity.oidc for a broker
+// (/api/bindings: an OpenID Connect client per app, IdentityBindings), /api/connections and the Connections area. It also registers MAT_FRAME_ANCESTORS
+// (the origins that may show MatIdentity in a frame, such as Mattiverse; without it nothing changes).
+var platformSettings = builder.AddMatPlatform<IdentityPlatform>(o => IdentityPlatform.Describe(o, matSmtp), o =>
+{
+    o.DefaultLanguage = "en";
+    // The settings are checked by MatIdentity itself, with the rules of its Settings page (SystemConfigService).
+    o.CheckValues = false;
+    o.DataDirectory = dataPath;
+    o.ConnectionsAccess = http => Task.FromResult(http.User.IsAdmin());
+    // MatIdentity speaks English: so does the Connections area of MatPlatform and its messages (2.2.0), whatever the browser asks for.
+    o.UiLanguage = _ => "en";
+    o.AnonymousPermitPerMinute = Math.Max(1, builder.Configuration.GetValue($"{MatIdentityOptions.SectionName}:RateLimits:Api", 240));
+});
+// The same key as /api/v1 (MatIdentity__ApiKey, else MAT_API_KEY), and tokens: MatIdentity is the identity itself, so a token it issued for its own API is checked by its own
+// validation (IdentityBearerHandler, the scheme MatPlatform asks). The authority of /api is its public address ("" when it answers at the address of each request).
+var ownApiKey = builder.Configuration[$"{MatIdentityOptions.SectionName}:ApiKey"];
+builder.Services.AddSingleton(new MatPlatformSettings
+{
+    AppId = platformSettings.AppId,
+    ApiKey = string.IsNullOrWhiteSpace(ownApiKey) ? platformSettings.ApiKey : ownApiKey.Trim(),
+    Authority = string.IsNullOrWhiteSpace(issuer) ? string.Empty : issuer.Trim().TrimEnd('/'),
+    ClientId = platformSettings.ClientId,
+    AppPublicUrl = platformSettings.AppPublicUrl,
+    AppInternalUrl = platformSettings.AppInternalUrl,
+});
+builder.Services.AddScoped<IMatBindingHandler, IdentityBindings>();
 builder.Services.AddMatIdentityCore();
 builder.Services.AddMatIdentityRateLimits(builder.Configuration);
 
@@ -190,7 +218,9 @@ builder.Services.AddAuthentication(AuthConstants.CookieScheme)
         options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
         options.ExpireTimeSpan = TimeSpan.FromMinutes(5);
         options.SlidingExpiration = false;
-    });
+    })
+    // A token on the protected part of /api (MatPlatform): one MatIdentity issued for its own API.
+    .AddScheme<AuthenticationSchemeOptions, IdentityBearerHandler>(MatApiAccess.BearerScheme, null);
 
 builder.Services.AddAuthorization(options =>
 {
@@ -219,7 +249,7 @@ builder.Services.AddRazorPages(options =>
     options.Conventions.AllowAnonymousToPage("/Error");
     options.Conventions.AllowAnonymousToPage("/StatusCode");
 
-    foreach (var folder in new[] { "/Apps", "/Users", "/Groups", "/Activity", "/Settings" })
+    foreach (var folder in new[] { "/Apps", "/Users", "/Groups", "/Activity", "/Settings", "/Connections" })
     {
         options.Conventions.AuthorizeFolder(folder, "AdminOnly");
     }
@@ -252,7 +282,7 @@ app.UseAuthorization();
 app.MapRazorPages();
 
 app.MapOidcEndpoints();
-app.MapMatPlatform(ApiAccess.RequireAsync, RateLimits.Api);
+app.MapMatPlatform();
 app.MapClientApi();
 app.MapThemeApi();
 app.MapPasskeyEndpoints();

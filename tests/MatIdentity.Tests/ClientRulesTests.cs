@@ -32,7 +32,15 @@ public sealed class ClientRulesTests
 
     [Fact]
     public void An_app_that_signs_people_in_needs_a_sign_in_address()
-        => Assert.Contains("redirectUris", ClientRules.Validate(Valid() with { RedirectUris = [] }).Keys);
+    {
+        Assert.Contains("redirectUris", ClientRules.Validate(Valid() with { RedirectUris = [] }).Keys);
+        Assert.Contains("redirectUris", ClientRules.Validate(Valid() with { RedirectUris = [], ManagedBy = "mattiverse" }).Keys);
+    }
+
+    [Fact]
+    public void An_app_connected_by_hand_gets_its_sign_in_addresses_later()
+        // The Connections area knows only the name of the app: its addresses are added under Apps afterwards.
+        => Assert.Empty(ClientRules.Validate(Valid() with { RedirectUris = [], ManagedBy = ClientRules.ManagedByHand }));
 
     [Theory]
     [InlineData("https://split.example.com/signin-oidc#x")]
