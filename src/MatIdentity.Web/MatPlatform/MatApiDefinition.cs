@@ -1,4 +1,4 @@
-// MatPlatform 2.2.0 – a copy from MatDesign, do not edit here
+// MatPlatform 2.4.0 – a copy from MatDesign, do not edit here
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -37,6 +37,12 @@ public sealed record MatApiDefinition
 
     /// <summary>The roles of the app, the most powerful first; MatIdentity offers them when an administrator gives the app to people (null: the app has none to offer).</summary>
     public IReadOnlyList<MatRole>? Roles { get; init; }
+
+    /// <summary>2.4.0: rights on top of a role that MatIdentity can give a person (claim <c>entitlements</c>); null: none.</summary>
+    public IReadOnlyList<MatPermission>? Permissions { get; init; }
+
+    /// <summary>2.4.0: numbers per person that MatIdentity can set (claim <c>mat_quotas</c>); null: none.</summary>
+    public IReadOnlyList<MatQuota>? Quotas { get; init; }
 
     /// <summary>The paths the app implements (for the list in <c>GET /api</c>).</summary>
     public IReadOnlyList<string> Endpoints { get; init; } = [];
@@ -140,6 +146,50 @@ public sealed record MatCapability(string Capability, int Version, bool? Optiona
 
 /// <summary>A role of the app: the value of the claim <c>role</c> and its name for people.</summary>
 public sealed record MatRole(string Key, string Label);
+
+/// <summary>
+/// A right on top of a role, an on/off switch (docs/PLATFORM.md "People, permissions and quotas"): its key is a value of the claim <c>entitlements</c>.
+/// <see cref="Roles"/>: the roles that have it without anyone giving it (null: only given by hand).
+/// </summary>
+public sealed record MatPermission(string Key, string Label)
+{
+    public string? Hint { get; init; }
+
+    public IReadOnlyList<string>? Roles { get; init; }
+}
+
+/// <summary>
+/// A number per person (docs/PLATFORM.md "People, permissions and quotas"): its key is a key of the claim <c>mat_quotas</c>. <see cref="Unit"/> is one of
+/// <see cref="MatQuotaUnits.All"/>, <see cref="Period"/> <c>day</c> or <c>month</c> (null: it does not renew). No default: without a value from MatIdentity the
+/// app's own setting applies.
+/// </summary>
+public sealed record MatQuota(string Key, string Label, string Unit)
+{
+    public string? Period { get; init; }
+
+    public long? Min { get; init; }
+
+    public long? Max { get; init; }
+
+    public string? Hint { get; init; }
+}
+
+/// <summary>The units and periods of a <see cref="MatQuota"/>.</summary>
+public static class MatQuotaUnits
+{
+    public const string Bytes = "bytes";
+    public const string Count = "count";
+    public const string Tokens = "tokens";
+    public const string Minutes = "minutes";
+    public const string Requests = "requests";
+
+    public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal) { Bytes, Count, Tokens, Minutes, Requests };
+
+    public const string Day = "day";
+    public const string Month = "month";
+
+    public static readonly IReadOnlySet<string> Periods = new HashSet<string>(StringComparer.Ordinal) { Day, Month };
+}
 
 /// <summary>A value of <c>GET /api/state</c>. The value is always written, also when it is null (a time that has not happened yet).</summary>
 public sealed record MatStateValue([property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] object? Value, string? Level = null, string? Text = null);

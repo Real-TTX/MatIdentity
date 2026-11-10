@@ -10,10 +10,12 @@ namespace MatIdentity.Core.Clients;
 public sealed class TokenRevoker
 {
     private readonly IOpenIddictTokenManager _tokens;
+    private readonly IOpenIddictApplicationManager? _applications;
 
-    public TokenRevoker(IOpenIddictTokenManager tokens)
+    public TokenRevoker(IOpenIddictTokenManager tokens, IOpenIddictApplicationManager? applications = null)
     {
         _tokens = tokens;
+        _applications = applications;
     }
 
     /// <summary>Revokes the valid refresh tokens of the person with the claim <c>sub</c> = <paramref name="subject"/>. Returns how many.</summary>
@@ -21,6 +23,26 @@ public sealed class TokenRevoker
     {
         var found = new List<object>();
         await foreach (var token in _tokens.FindBySubjectAsync(subject, ct))
+        {
+            found.Add(token);
+        }
+
+        return await RevokeRefreshTokensAsync(found, ct);
+    }
+
+    /// <summary>
+    /// Revokes the valid refresh tokens of the person <paramref name="subject"/> in one app (its access, role, permissions or quotas there changed: the app has to
+    /// sign the person in again to get the new values). Returns how many.
+    /// </summary>
+    public async Task<int> RevokeForSubjectAndClientAsync(string subject, string clientId, CancellationToken ct = default)
+    {
+        if (_applications is null || await _applications.FindByClientIdAsync(clientId, ct) is not { } app || await _applications.GetIdAsync(app, ct) is not { } appId)
+        {
+            return 0;
+        }
+
+        var found = new List<object>();
+        await foreach (var token in _tokens.FindAsync(subject, appId, status: null, type: null, ct))
         {
             found.Add(token);
         }
@@ -45,7 +67,8 @@ public sealed class TokenRevoker
         var count = 0;
         foreach (var token in tokens)
         {
-            if (await _tokens.GetTypeAsync(token, ct) == TokenTypeHints.RefreshToken
+            // OpenIddict 5 and later keep the type as its URN (urn:ietf:params:oauth:token-type:refresh_token); before, it was the hint "refresh_token".
+            if (await _tokens.GetTypeAsync(token, ct) is TokenTypeIdentifiers.RefreshToken or TokenTypeHints.RefreshToken
                 && await _tokens.HasStatusAsync(token, Statuses.Valid, ct)
                 && await _tokens.TryRevokeAsync(token, ct))
             {

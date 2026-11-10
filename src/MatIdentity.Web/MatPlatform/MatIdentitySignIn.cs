@@ -1,4 +1,4 @@
-// MatPlatform 2.2.0 – a copy from MatDesign, do not edit here
+// MatPlatform 2.4.0 – a copy from MatDesign, do not edit here
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -32,6 +32,18 @@ public sealed record MatIdentityPerson(string Subject, string? Email, string? Na
     /// that names it ends only that session (<see cref="IMatIdentitySessions"/>). Null when MatIdentity sent none.
     /// </summary>
     public string? SessionId { get; init; }
+
+    /// <summary>
+    /// 2.4.0: the claim <c>entitlements</c>: the person's permissions in this app (those of the role included). Null when MatIdentity does not decide the roles of
+    /// this app (no <see cref="Role"/>): the app decides itself. <see cref="MatAccess"/> keeps it for later questions.
+    /// </summary>
+    public IReadOnlyList<string>? Permissions { get; init; }
+
+    /// <summary>
+    /// 2.4.0: the claim <c>mat_quotas</c>: the quotas MatIdentity set for the person in this app; a null value is no limit, a key that is not there the app's own
+    /// setting. Empty without a <see cref="Role"/>.
+    /// </summary>
+    public IReadOnlyDictionary<string, long?>? Quotas { get; init; }
 }
 
 /// <summary>What the app answers to a person MatIdentity signed in.</summary>
@@ -393,16 +405,20 @@ public static class MatIdentitySignIn
 
         string? Claim(string type) => principal.FindFirst(type)?.Value;
 
+        var role = Claim(signIn.RoleClaim);
         var person = new MatIdentityPerson(
             Claim("sub") ?? string.Empty,
             Claim("email"),
             Claim("name"),
             Claim("preferred_username"),
-            Claim(signIn.RoleClaim),
+            role,
             context.Properties?.GetTokenValue("id_token") ?? http.Items[IdTokenItem] as string,
             principal)
         {
             SessionId = Claim("sid"),
+            // 2.4.0: only with a role does MatIdentity decide anything here; without one the app decides as before.
+            Permissions = role is null ? null : MatAccessClaims.PermissionsOf(principal),
+            Quotas = role is null ? new Dictionary<string, long?>() : MatAccessClaims.QuotasOf(principal),
         };
 
         var target = await CompleteSignInAsync(http, person, context.ReturnUri);
@@ -422,6 +438,12 @@ public static class MatIdentitySignIn
         ArgumentNullException.ThrowIfNull(person);
 
         var signIn = http.RequestServices.GetService<MatIdentitySignInOptions>() ?? new MatIdentitySignInOptions();
+        // 2.4.0: what MatIdentity said about the person is kept first, so the app can ask MatAccess already while it signs the person in.
+        if (http.RequestServices.GetService<MatAccess>() is { } access)
+        {
+            await access.RememberAsync(person, http.RequestAborted);
+        }
+
         var result = await http.RequestServices.GetRequiredService<IMatIdentityUsers>().SignInAsync(person, http, http.RequestAborted);
 
         if (result.LinkAccount is { } account)

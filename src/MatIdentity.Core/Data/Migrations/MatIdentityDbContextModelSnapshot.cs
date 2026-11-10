@@ -181,6 +181,14 @@ namespace MatIdentity.Core.Data.Migrations
                     b.Property<long?>("GroupId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("Permissions")
+                        .HasMaxLength(4000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Quotas")
+                        .HasMaxLength(4000)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("RoleKey")
                         .HasMaxLength(64)
                         .HasColumnType("TEXT");
@@ -206,6 +214,62 @@ namespace MatIdentity.Core.Data.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("AppGrant", (string)null);
+                });
+
+            modelBuilder.Entity("MatIdentity.Core.Entities.AppPermission", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ClientId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreateDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("CreateUserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Hint")
+                        .HasMaxLength(300)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Roles")
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("UpdateDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("UpdateState")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("UpdateUserId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClientId", "Key")
+                        .IsUnique()
+                        .HasFilter("\"UpdateState\" <> 0");
+
+                    b.ToTable("AppPermission", (string)null);
                 });
 
             modelBuilder.Entity("MatIdentity.Core.Entities.AppPolicy", b =>
@@ -250,6 +314,73 @@ namespace MatIdentity.Core.Data.Migrations
                         .HasFilter("\"UpdateState\" <> 0");
 
                     b.ToTable("AppPolicy", (string)null);
+                });
+
+            modelBuilder.Entity("MatIdentity.Core.Entities.AppQuota", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ClientId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreateDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("CreateUserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Hint")
+                        .HasMaxLength(300)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("Max")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("Min")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Period")
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdateDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("UpdateState")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("UpdateUserId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClientId", "Key")
+                        .IsUnique()
+                        .HasFilter("\"UpdateState\" <> 0");
+
+                    b.ToTable("AppQuota", (string)null);
                 });
 
             modelBuilder.Entity("MatIdentity.Core.Entities.AppRole", b =>
@@ -314,6 +445,10 @@ namespace MatIdentity.Core.Data.Migrations
 
                     b.Property<string>("Description")
                         .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ExternalId")
+                        .HasMaxLength(256)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Name")
@@ -458,6 +593,10 @@ namespace MatIdentity.Core.Data.Migrations
 
                     b.Property<bool>("EmailVerified")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("ExternalId")
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("FailedSignIns")
                         .HasColumnType("INTEGER");

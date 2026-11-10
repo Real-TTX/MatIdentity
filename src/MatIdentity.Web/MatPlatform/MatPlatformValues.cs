@@ -1,4 +1,4 @@
-// MatPlatform 2.2.0 – a copy from MatDesign, do not edit here
+// MatPlatform 2.4.0 – a copy from MatDesign, do not edit here
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 
@@ -54,6 +54,28 @@ public interface IMatPlatformHealth
     /// <summary>The checks, each <c>ok</c>, <c>degraded</c> or <c>down</c>; the status of the app is the worst of them.</summary>
     Task<IReadOnlyList<MatHealthCheck>> CheckHealthAsync(MatPlatformCall call, CancellationToken ct);
 }
+
+/// <summary>2.4.0: what a person uses of one quota, and the app's own limit for them (null: no limit).</summary>
+public sealed record MatQuotaUsage(long Used, long? Limit);
+
+/// <summary>2.4.0: what a person uses of the app's quotas (<c>GET /api/quotas/{subject}</c>); MatPlatform puts MatIdentity's value over the app's own limit.</summary>
+public interface IMatPlatformQuotas
+{
+    /// <summary>
+    /// One entry per quota of the definition (a missing one counts as nothing used and the app's limit as none): what <paramref name="subject"/> uses and the app's
+    /// own limit for them (its default or its setting for this person); null when the app does not know the person (404).
+    /// </summary>
+    Task<IReadOnlyDictionary<string, MatQuotaUsage>?> GetUsageAsync(string subject, MatPlatformCall call, CancellationToken ct);
+}
+
+/// <summary>2.4.0: the answer of <c>GET /api/quotas/{subject}</c>.</summary>
+public sealed record MatQuotaReport(string Subject, IReadOnlyDictionary<string, MatQuotaReportValue> Values);
+
+/// <summary>
+/// One quota of a person: what is used, the limit that applies now (MatIdentity's when <see cref="Fixed"/>, else the app's own; null: no limit; always written) and
+/// the period of the quota.
+/// </summary>
+public sealed record MatQuotaReportValue(long Used, [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)] long? Limit, bool Fixed, string? Period = null);
 
 /// <summary>The rows of the widgets of the kind <c>list</c> (<c>GET /api/widgets/{id}</c>).</summary>
 public interface IMatPlatformWidgets

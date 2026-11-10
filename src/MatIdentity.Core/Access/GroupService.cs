@@ -4,14 +4,32 @@ using Microsoft.EntityFrameworkCore;
 
 namespace MatIdentity.Core.Access;
 
-/// <summary>The groups and who is in them.</summary>
+/// <summary>The groups and who is in them. A change of the members tells the apps the group is given to (<see cref="PermissionService.WatchAsync"/>).</summary>
 public sealed class GroupService
 {
     private readonly MatIdentityDbContext _db;
+    private readonly PermissionService _permissions;
 
-    public GroupService(MatIdentityDbContext db)
+    public GroupService(MatIdentityDbContext db, PermissionService permissions)
     {
         _db = db;
+        _permissions = permissions;
+    }
+
+    /// <summary>The groups by id (for SCIM and the pages).</summary>
+    public Task<List<Group>> ListAsync(CancellationToken ct = default) => _db.Groups.AsNoTracking().OrderBy(g => g.Name).ToListAsync(ct);
+
+    /// <summary>The group with a SCIM client's id for it.</summary>
+    public Task<Group?> GetByExternalIdAsync(string externalId, CancellationToken ct = default) => _db.Groups.FirstOrDefaultAsync(g => g.ExternalId == externalId, ct);
+
+    /// <summary>Sets the id a SCIM client keeps for the group.</summary>
+    public async Task SetExternalIdAsync(long id, string? externalId, CancellationToken ct = default)
+    {
+        if (await _db.Groups.FirstOrDefaultAsync(g => g.Id == id, ct) is { } group)
+        {
+            group.ExternalId = string.IsNullOrWhiteSpace(externalId) ? null : externalId.Trim();
+            await _db.SaveChangesAsync(ct);
+        }
     }
 
     /// <summary>The groups with the number of (active, not deleted) members, by name.</summary>
@@ -43,6 +61,21 @@ public sealed class GroupService
     public async Task<Group> SaveAsync(long? id, string name, string? description, IEnumerable<long> memberIds, CancellationToken ct = default)
     {
         var group = id is > 0 ? await _db.Groups.FirstOrDefaultAsync(g => g.Id == id, ct) ?? throw new InvalidOperationException("No such group.") : new Group();
+        if (group.Id > 0)
+        {
+            // The apps the group is given to hear of every member who came or went.
+            var wanted = memberIds.ToList();
+            var clients = await ClientsOfAsync(group.Id, ct);
+            await _permissions.WatchAsync(clients, wanted, () => SaveCoreAsync(group, name, description, wanted, ct), ct, group.Id);
+            return group;
+        }
+
+        await SaveCoreAsync(group, name, description, memberIds, ct);
+        return group;
+    }
+
+    private async Task SaveCoreAsync(Group group, string name, string? description, IEnumerable<long> memberIds, CancellationToken ct)
+    {
         group.Name = name.Trim();
         group.Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
         if (group.Id == 0)
@@ -60,11 +93,17 @@ public sealed class GroupService
         }
 
         await _db.SaveChangesAsync(ct);
-        return group;
     }
 
+    /// <summary>The apps a group is given to.</summary>
+    private Task<List<string>> ClientsOfAsync(long groupId, CancellationToken ct)
+        => _db.AppGrants.Where(g => g.GroupId == groupId).Select(g => g.ClientId).Distinct().ToListAsync(ct);
+
     /// <summary>Sets the groups of a person to exactly <paramref name="groupIds"/> (from the page of the person).</summary>
-    public async Task SetGroupsOfAsync(long userId, IEnumerable<long> groupIds, CancellationToken ct = default)
+    public Task SetGroupsOfAsync(long userId, IEnumerable<long> groupIds, CancellationToken ct = default)
+        => _permissions.WatchAsync(null, [userId], () => SetGroupsCoreAsync(userId, groupIds, ct), ct);
+
+    private async Task SetGroupsCoreAsync(long userId, IEnumerable<long> groupIds, CancellationToken ct)
     {
         var wanted = groupIds.ToHashSet();
         var existing = await _db.GroupMembers.Where(m => m.UserId == userId).ToListAsync(ct);
@@ -87,10 +126,14 @@ public sealed class GroupService
             return false;
         }
 
-        _db.GroupMembers.RemoveRange(await _db.GroupMembers.Where(m => m.GroupId == id).ToListAsync(ct));
-        _db.AppGrants.RemoveRange(await _db.AppGrants.Where(a => a.GroupId == id).ToListAsync(ct));
-        _db.Groups.Remove(group);
-        await _db.SaveChangesAsync(ct);
+        var members = await MemberIdsAsync(id, ct);
+        await _permissions.WatchAsync(await ClientsOfAsync(id, ct), members, async () =>
+        {
+            _db.GroupMembers.RemoveRange(await _db.GroupMembers.Where(m => m.GroupId == id).ToListAsync(ct));
+            _db.AppGrants.RemoveRange(await _db.AppGrants.Where(a => a.GroupId == id).ToListAsync(ct));
+            _db.Groups.Remove(group);
+            await _db.SaveChangesAsync(ct);
+        }, ct);
         return true;
     }
 }

@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Threading.Channels;
+using MatIdentity.Core.Access;
 using MatIdentity.Core.Auth;
 using MatIdentity.Core.Clients;
 using Microsoft.Extensions.Options;
@@ -17,18 +18,20 @@ public sealed record LogoutNotice(string Issuer, string ClientId, string Address
 /// OpenID Connect Back-Channel Logout 1.0: when sessions end here (a sign-out, "sign out on other devices", a disabled account, a new password, "sign everyone out"),
 /// every app that has a back-channel address and was signed in to from those sessions gets a signed <c>logout_token</c> (iss, aud = the app, sub, sid, events)
 /// and ends its own session. A person out everywhere is announced to every such app with <c>sub</c> alone. The tokens go out after the answer
-/// (<see cref="BackchannelLogoutWorker"/>).
+/// (<see cref="BackchannelLogoutWorker"/>). When the access, role, permissions or quotas of a person in an app change (<see cref="IAccessChangeListener"/>), that app
+/// hears it the same way, with the subject alone: it ends the person's sessions, and the next request signs them in again with the new values.
 /// </summary>
-public sealed class BackchannelLogout : ISessionEndListener
+public sealed class BackchannelLogout : ISessionEndListener, IAccessChangeListener
 {
-    private readonly ClientService _clients;
+    private readonly IServiceProvider _services;
     private readonly BackchannelLogoutQueue _queue;
     private readonly IOptionsMonitor<OpenIddictServerOptions> _server;
     private readonly IHttpContextAccessor _http;
 
-    public BackchannelLogout(ClientService clients, BackchannelLogoutQueue queue, IOptionsMonitor<OpenIddictServerOptions> server, IHttpContextAccessor http)
+    // ClientService is fetched when it is needed: it depends on PermissionService, which tells this class about changes of access (a cycle otherwise).
+    public BackchannelLogout(IServiceProvider services, BackchannelLogoutQueue queue, IOptionsMonitor<OpenIddictServerOptions> server, IHttpContextAccessor http)
     {
-        _clients = clients;
+        _services = services;
         _queue = queue;
         _server = server;
         _http = http;
@@ -41,7 +44,7 @@ public sealed class BackchannelLogout : ISessionEndListener
             return;
         }
 
-        var addresses = (await _clients.GetAllAsync(ct))
+        var addresses = (await _services.GetRequiredService<ClientService>().GetAllAsync(ct))
             .Where(c => !string.IsNullOrEmpty(c.BackchannelLogoutUri))
             .ToDictionary(c => c.ClientId, c => c.BackchannelLogoutUri!, StringComparer.Ordinal);
         if (addresses.Count == 0)
@@ -72,6 +75,26 @@ public sealed class BackchannelLogout : ISessionEndListener
                 {
                     _queue.Enqueue(new LogoutNotice(issuer, clientId, address, session.Subject, session.Sid));
                 }
+            }
+        }
+    }
+
+    public async Task AccessChangedAsync(IReadOnlyList<AccessChange> changes, CancellationToken ct)
+    {
+        if (changes.Count == 0)
+        {
+            return;
+        }
+
+        var addresses = (await _services.GetRequiredService<ClientService>().GetAllAsync(ct))
+            .Where(c => !string.IsNullOrEmpty(c.BackchannelLogoutUri))
+            .ToDictionary(c => c.ClientId, c => c.BackchannelLogoutUri!, StringComparer.Ordinal);
+        var issuer = Issuer();
+        foreach (var change in changes.Distinct())
+        {
+            if (addresses.TryGetValue(change.ClientId, out var address))
+            {
+                _queue.Enqueue(new LogoutNotice(issuer, change.ClientId, address, change.Subject, null));
             }
         }
     }

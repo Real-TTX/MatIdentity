@@ -1,4 +1,4 @@
-// MatPlatform 2.2.0 – a copy from MatDesign, do not edit here
+// MatPlatform 2.4.0 – a copy from MatDesign, do not edit here
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Authentication;
@@ -19,6 +19,9 @@ public sealed class MatApiAccess
 
     /// <summary>Where the name of the caller is kept in <see cref="HttpContext.Items"/>.</summary>
     public const string CallerKey = "matplatform:api-caller";
+
+    /// <summary>2.4.0: where <see cref="AuthenticateAsync"/> notes that the caller is a machine (the key, or a token of a client for itself), not a person.</summary>
+    public const string MachineKey = "matplatform:api-machine";
 
     /// <summary>The JWT bearer scheme that validates tokens of MatIdentity (registered only when MatIdentity is configured).</summary>
     public const string BearerScheme = "MatIdentityBearer";
@@ -45,6 +48,7 @@ public sealed class MatApiAccess
             var given = Encoding.UTF8.GetBytes(sent.ToString());
             if (CryptographicOperations.FixedTimeEquals(given, _key))
             {
+                http.Items[MachineKey] = true;
                 return "api-key";
             }
         }
@@ -57,6 +61,10 @@ public sealed class MatApiAccess
             var result = await http.AuthenticateAsync(BearerScheme);
             if (result.Succeeded)
             {
+                // A token of a machine (client credentials) is the client's own: its subject is its client id. A person's token names the person.
+                var subject = result.Principal.FindFirst("sub")?.Value;
+                var client = result.Principal.FindFirst("client_id")?.Value ?? result.Principal.FindFirst("azp")?.Value;
+                http.Items[MachineKey] = subject is not null && string.Equals(subject, client, StringComparison.Ordinal);
                 return result.Principal.FindFirst("sub")?.Value
                     ?? result.Principal.FindFirst("client_id")?.Value
                     ?? "token";
@@ -85,6 +93,9 @@ public sealed class MatApiAccess
         http.Items[CallerKey] = caller;
         return await next(context);
     }
+
+    /// <summary>2.4.0: the caller that <see cref="RequireAsync"/> let in is a machine (the key, or the token a client got for itself), never a person.</summary>
+    public static bool IsMachine(HttpContext http) => http?.Items[MachineKey] is true;
 
     /// <summary>The caller that <see cref="RequireAsync"/> let in, or <paramref name="fallback"/>.</summary>
     public static string CallerOf(HttpContext http, string fallback = "api") => http?.Items[CallerKey] as string ?? fallback;

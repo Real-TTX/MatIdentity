@@ -63,6 +63,10 @@
                                     {
                                         <span class="mat-table__name">@g.User!.DisplayName</span> <span class="mat-muted">@g.User.Username</span>
                                     }
+                                    @if (byMatIdentity && Model.Summary(g) is { } given)
+                                    {
+                                        <div class="mat-muted">@given</div>
+                                    }
                                 </td>
                                 @if (byMatIdentity)
                                 {
@@ -81,6 +85,11 @@
                                 }
                                 <td class="mat-table__cell-actions">
                                     <div class="mat-table__actions">
+                                        @if (byMatIdentity && Model.AppPermissions.Count + Model.AppQuotas.Count > 0)
+                                        {
+                                            <a class="mat-btn mat-btn--secondary mat-btn--icon mat-btn--sm" href="/Apps/Grant?id=@Uri.EscapeDataString(Model.Id)&amp;grant=@g.Id"
+                                               aria-label="Permissions and quotas of @(g.Group?.Name ?? g.User!.DisplayName)" data-tip="Permissions and quotas"><icon name="sliders" /></a>
+                                        }
                                         <form method="post" asp-page-handler="Revoke" asp-route-id="@Model.Id" data-confirm="Take @Model.App.DisplayName away from @(g.Group?.Name ?? g.User!.DisplayName)?" data-confirm-ok="Take away" data-confirm-danger>
                                             <input type="hidden" name="grantId" value="@g.Id" />
                                             <button type="submit" class="mat-btn mat-btn--danger mat-btn--icon mat-btn--sm" aria-label="Take away from @(g.Group?.Name ?? g.User!.DisplayName)" data-tip="Take away"><icon name="trash" /></button>
@@ -153,4 +162,56 @@
             </div>
         </div>
     </form>
+
+    <div class="mat-card">
+        <div class="mat-card__head"><icon name="sliders" /><span class="mat-card__title">Permissions and quotas of the app</span></div>
+        <div class="mat-card__body mat-stack">
+            @if (Model.AppPermissions.Count + Model.AppQuotas.Count == 0)
+            {
+                <p class="mat-hint">The app names none in its /api. "Read from the app" reads them together with the roles.</p>
+            }
+            else
+            {
+                <p class="mat-muted">The app names them in its /api; they go into the token as <span class="mat-mono">entitlements</span> and <span class="mat-mono">mat_quotas</span>. Give them per person or group with <icon name="sliders" /> above.</p>
+                @if (Model.AppPermissions.Count > 0)
+                {
+                    <div class="mat-table-wrap">
+                        <table class="mat-table">
+                            <caption class="mat-sr-only">Permissions</caption>
+                            <thead><tr><th scope="col">Permission</th><th scope="col">Key</th><th scope="col" class="mat-hide-sm">Comes with the role</th></tr></thead>
+                            <tbody>
+                                @foreach (var p in Model.AppPermissions)
+                                {
+                                    <tr>
+                                        <td data-label="Permission">@p.Label</td>
+                                        <td data-label="Key" class="mat-mono">@p.Key</td>
+                                        <td data-label="Comes with the role" class="mat-hide-sm">@(p.Roles is { Count: > 0 } r ? string.Join(", ", Model.Roles.Where(x => r.Contains(x.Key)).Select(x => x.Label)) : "–")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                @if (Model.AppQuotas.Count > 0)
+                {
+                    <div class="mat-table-wrap">
+                        <table class="mat-table">
+                            <caption class="mat-sr-only">Quotas</caption>
+                            <thead><tr><th scope="col">Quota</th><th scope="col">Key</th><th scope="col">Unit</th></tr></thead>
+                            <tbody>
+                                @foreach (var q in Model.AppQuotas)
+                                {
+                                    <tr>
+                                        <td data-label="Quota">@q.Label</td>
+                                        <td data-label="Key" class="mat-mono">@q.Key</td>
+                                        <td data-label="Unit">@GrantModel.UnitOf(q)</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            }
+        </div>
+    </div>
 }

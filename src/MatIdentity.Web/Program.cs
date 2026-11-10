@@ -71,9 +71,14 @@ builder.Services.AddSingleton<MatIdentity.Web.Support.Toolkit>();
 builder.Services.AddSingleton<ApiAccess>();
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<AppRolesReader>();
+// SCIM 2.0 at /scim/v2 (MatDesign docs/PLATFORM.md "SCIM at MatIdentity"): what a change of a person does.
+builder.Services.AddScoped<ScimPeople>();
 // Back-channel logout: when sessions end here, the apps with a back-channel address hear it (signed logout tokens, sent after the answer).
 builder.Services.AddSingleton<BackchannelLogoutQueue>();
-builder.Services.AddScoped<MatIdentity.Core.Auth.ISessionEndListener, BackchannelLogout>();
+builder.Services.AddScoped<BackchannelLogout>();
+builder.Services.AddScoped<MatIdentity.Core.Auth.ISessionEndListener>(sp => sp.GetRequiredService<BackchannelLogout>());
+// The same tokens when the access, role, permissions or quotas of a person in an app change (MatDesign docs/PLATFORM.md "People, permissions and quotas").
+builder.Services.AddScoped<MatIdentity.Core.Access.IAccessChangeListener>(sp => sp.GetRequiredService<BackchannelLogout>());
 builder.Services.AddHostedService<BackchannelLogoutWorker>();
 builder.Services.AddHttpClient(BackchannelLogoutWorker.HttpClientName);
 
@@ -282,6 +287,7 @@ app.UseAuthorization();
 app.MapRazorPages();
 
 app.MapOidcEndpoints();
+app.MapScimEndpoints();
 app.MapMatPlatform();
 app.MapClientApi();
 app.MapThemeApi();

@@ -107,6 +107,7 @@ public sealed class IdentityPlatform : IMatPlatformState, IMatPlatformConfigurat
 
         // A binding of identity.oidc is an OpenID Connect client of the consumer (IdentityBindings); the mail goes through MatSMTP when it is bound.
         o.Provides(MatCapabilities.IdentityOidc, label: o.T("Meldet Personen an für", "Signs people in for"))
+            .Provides(MatPeople.Capability, label: o.T("Nennt seine Personen", "Names its people to"))
             .Consumes(MatCapabilities.MailSmtp, optional: true);
     }
 

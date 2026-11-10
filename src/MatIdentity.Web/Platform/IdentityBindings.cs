@@ -68,14 +68,18 @@ public sealed class IdentityBindings(
         // An empty backchannel means none (Param would give the default for it).
         var backchannel = request.Params.TryGetValue(BackchannelParam, out var given) ? given?.Trim() ?? string.Empty : DefaultBackchannel;
 
-        // The roles the consumer names in its /api, read where MatIdentity reaches it (the shared network first); roles it cannot use leave the client's as they are.
-        var (roles, _) = internalUrl is not null || addresses.Count > 0
-            ? await rolesReader.ReadAsync(internalUrl ?? addresses[0], ct)
-            : (null, null);
+        // The roles, permissions and quotas the consumer names in its /api, read where MatIdentity reaches it (the shared network first). Roles it cannot use
+        // leave the client's as they are, and so does an /api that cannot be read or that names permissions or quotas MatIdentity cannot keep.
+        var catalog = internalUrl is not null || addresses.Count > 0
+            ? await rolesReader.ReadCatalogAsync(internalUrl ?? addresses[0], ct)
+            : new AppCatalogRead(null, [], [], "The app has no address to ask.");
+        var roles = catalog.Roles;
         if (roles is not null && PermissionService.ValidateRoles(roles).Count > 0)
         {
             roles = null;
         }
+
+        var catalogUsable = catalog.Succeeded && PermissionService.ValidateCatalog(catalog.Permissions, catalog.Quotas).Count == 0;
 
         var name = string.IsNullOrWhiteSpace(request.Consumer.Name) ? clientId : request.Consumer.Name.Trim();
         var upsert = new ClientUpsert
@@ -93,6 +97,8 @@ public sealed class IdentityBindings(
             ManagedBy = request.ManagedBy,
             RenewSecret = request.Renew,
             Roles = roles,
+            Permissions = catalogUsable ? catalog.Permissions : null,
+            Quotas = catalogUsable ? catalog.Quotas : null,
         };
 
         var (saved, created) = await clients.UpsertAsync(upsert, ct);

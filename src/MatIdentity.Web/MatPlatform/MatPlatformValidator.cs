@@ -1,4 +1,4 @@
-// MatPlatform 2.2.0 – a copy from MatDesign, do not edit here
+// MatPlatform 2.4.0 – a copy from MatDesign, do not edit here
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -164,6 +164,7 @@ public static partial class MatPlatformValidator
         }
 
         Unique(problems, "roles", (definition.Roles ?? []).Select(r => r.Key));
+        PeopleChecks(problems, definition);
 
         foreach (var capability in definition.Provides.Concat(definition.Consumes))
         {
@@ -200,6 +201,7 @@ public static partial class MatPlatformValidator
             Relative(problems, what + ": the icon", launcher.Icon);
             Relative(problems, what + ": the url", launcher.Url);
             Audience(problems, what, launcher.Audience);
+            RolesOf(problems, what, launcher.Roles, definition);
             if (launcher.Badge is not null && !state.Contains(launcher.Badge))
             {
                 problems.Add($"{what}: the badge \"{launcher.Badge}\" is not a key of state.");
@@ -264,6 +266,7 @@ public static partial class MatPlatformValidator
             }
 
             Audience(problems, what, widget.Audience);
+            RolesOf(problems, what, widget.Roles, definition);
         }
 
         var posts = definition.Actions.Where(a => a.Kind == "post").Select(a => a.Id).ToHashSet(StringComparer.Ordinal);
@@ -289,6 +292,66 @@ public static partial class MatPlatformValidator
             {
                 problems.Add($"{what}: \"{quick.Action}\" is not a post action.");
             }
+        }
+    }
+
+    /// <summary>2.4.0: the permissions and quotas: keys like a role key (unique), labels, the roles a permission names, the unit, period and limits of a quota.</summary>
+    private static void PeopleChecks(List<string> problems, MatApiDefinition definition)
+    {
+        foreach (var permission in definition.Permissions ?? [])
+        {
+            var what = $"permission \"{permission.Key}\"";
+            if (!AccessKeyRegex().IsMatch(permission.Key ?? string.Empty))
+            {
+                problems.Add($"{what}: small letters and digits first, then also - and _, at most 64.");
+            }
+
+            Required(problems, what + ": the label", permission.Label);
+            RolesOf(problems, what, permission.Roles, definition);
+        }
+
+        Unique(problems, "permissions", (definition.Permissions ?? []).Select(p => p.Key));
+
+        foreach (var quota in definition.Quotas ?? [])
+        {
+            var what = $"quota \"{quota.Key}\"";
+            if (!AccessKeyRegex().IsMatch(quota.Key ?? string.Empty))
+            {
+                problems.Add($"{what}: small letters and digits first, then also - and _, at most 64.");
+            }
+
+            Required(problems, what + ": the label", quota.Label);
+            if (!MatQuotaUnits.All.Contains(quota.Unit ?? string.Empty))
+            {
+                problems.Add($"{what}: the unit \"{quota.Unit}\" is not one of {string.Join(", ", MatQuotaUnits.All)}.");
+            }
+
+            if (quota.Period is not null && !MatQuotaUnits.Periods.Contains(quota.Period))
+            {
+                problems.Add($"{what}: the period \"{quota.Period}\" is not one of {string.Join(", ", MatQuotaUnits.Periods)}.");
+            }
+
+            if (quota.Min is < 0 || (quota.Min is { } min && quota.Max is { } max && min > max))
+            {
+                problems.Add($"{what}: min is from 0 and not above max.");
+            }
+        }
+
+        Unique(problems, "quotas", (definition.Quotas ?? []).Select(q => q.Key));
+    }
+
+    /// <summary>Every key of <paramref name="roles"/> is a role of the definition.</summary>
+    private static void RolesOf(List<string> problems, string what, IReadOnlyList<string>? roles, MatApiDefinition definition)
+    {
+        if (roles is null)
+        {
+            return;
+        }
+
+        var known = (definition.Roles ?? []).Select(r => r.Key).ToHashSet(StringComparer.Ordinal);
+        foreach (var role in roles.Where(r => !known.Contains(r ?? string.Empty)))
+        {
+            problems.Add($"{what}: \"{role}\" is not a role of the app.");
         }
     }
 
@@ -394,6 +457,10 @@ public static partial class MatPlatformValidator
 
     [GeneratedRegex("^[a-z0-9_-]+$")]
     private static partial Regex RoleRegex();
+
+    /// <summary>The key of a permission or a quota: the form MatIdentity keeps role keys in.</summary>
+    [GeneratedRegex("^[a-z0-9][a-z0-9_-]{0,63}$")]
+    private static partial Regex AccessKeyRegex();
 
     [GeneratedRegex(@"^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)+$")]
     private static partial Regex CapabilityRegex();

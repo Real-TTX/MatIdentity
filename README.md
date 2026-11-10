@@ -305,7 +305,9 @@ MatIdentity speaks the platform contract of the Mat apps (MatDesign [docs/PLATFO
 | `PUT /api/bindings/identity.oidc/{app}` | Bind an app: its OpenID Connect client (below), answered as its four `MATIDENTITY_*` variables. Key only |
 | `DELETE /api/bindings/identity.oidc/{app}?managedBy=` | Remove the client, only with its mark (none given: any mark; never an app without one). Key only |
 | `GET /api/connections` | What MatIdentity offers and uses, as the Connections page shows it (secrets as `{"isSet": …}`) |
-| `/api/v1/clients` | The apps (create, change, remove what the caller created): Mattiverse registers itself here; `backchannelLogoutUri` and `callTargets` are optional |
+| `/api/v1/clients` | The apps (create, change, remove what the caller created): Mattiverse registers itself here; `backchannelLogoutUri`, `callTargets`, `permissions` and `quotas` are optional; each answer names the role mode, roles, permissions and quotas |
+| `POST /api/v1/people/{subject}/actions/{action}` | `invite`, `resetPassword`, `signOut`, `unlock`, `resetSecondStep`: what SCIM has no word for |
+| `/scim/v2/Users`, `/scim/v2/Groups` | People and groups as SCIM 2.0, with what they are given in the apps (the extension `urn:mat:scim:schemas:extension:access:1.0`). With the key everything; with the key of a binding of `people.scim` the people of one app, read only. A company's directory (Entra ID, Okta, Google) can provision people with it |
 
 Access with `X-Api-Key: <MAT_API_KEY>` or a token of MatIdentity whose audience is `app:matidentity` (an app gets that scope only by name, never through "calls every app");
 `/api/bindings` takes the key only.
@@ -329,6 +331,11 @@ The client: id `matdrive` (`-app` added to a one-letter id), its name, the sign-
 `/api` names. The parameters `callback`, `signedOut` and `backchannel` change the paths (`backchannel: ""`: none). The secret goes out once: when the client is
 new or with `"renew": true` (the old one stops at once); otherwise `{"isSet": true}`. The authority is MatIdentity's public address; without one, the address the
 broker names.
+
+**Permissions and quotas.** Beside its roles an app can name rights on top of a role (`permissions`) and numbers per person (`quotas`, such as storage or AI tokens a month)
+in its `/api`. MatIdentity reads them with the roles and gives them per person or group under *Apps → Access* (the button with the sliders of a grant); permissions add up
+over the groups, a quota is the person's own value or the largest of their groups'. They reach the app in the token as `entitlements` and `mat_quotas`, and a change ends
+the person's sessions in that app at once, so the next request brings the new values.
 
 The apps use the shared .NET package **MatPlatform** of MatDesign for their side: the endpoints, the sign-in through MatIdentity (auto-login, `?local=1`
 for the local form, sign-out at MatIdentity, the scheme behind a TLS proxy) and the rule for existing accounts: an account of the app that has the

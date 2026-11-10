@@ -1,4 +1,4 @@
-// MatPlatform 2.2.0 – a copy from MatDesign, do not edit here
+// MatPlatform 2.4.0 – a copy from MatDesign, do not edit here
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Antiforgery;

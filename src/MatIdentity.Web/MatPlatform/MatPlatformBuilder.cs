@@ -1,4 +1,4 @@
-// MatPlatform 2.2.0 – a copy from MatDesign, do not edit here
+// MatPlatform 2.4.0 – a copy from MatDesign, do not edit here
 using Microsoft.AspNetCore.Http;
 
 namespace MatPlatform;
@@ -15,6 +15,8 @@ public sealed class MatPlatformBuilder
     private readonly List<MatField> _configure = [];
     private readonly List<MatAction> _actions = [];
     private readonly List<MatRole> _roles = [];
+    private readonly List<MatPermission> _permissions = [];
+    private readonly List<MatQuota> _quotas = [];
     private readonly List<MatCapability> _provides = [];
     private readonly List<MatCapability> _consumes = [];
     private readonly List<MatLauncher> _launchers = [];
@@ -95,6 +97,26 @@ public sealed class MatPlatformBuilder
         return this;
     }
 
+    /// <summary>
+    /// 2.4.0: a right on top of a role that MatIdentity can give a person (docs/PLATFORM.md "People, permissions and quotas"); <paramref name="roles"/>: the roles that have it
+    /// without anyone giving it.
+    /// </summary>
+    public MatPlatformBuilder Permission(string key, string label, string? hint = null, params string[] roles)
+    {
+        _permissions.Add(new MatPermission(key, label) { Hint = hint, Roles = roles is { Length: > 0 } ? roles : null });
+        return this;
+    }
+
+    /// <summary>
+    /// 2.4.0: a number per person that MatIdentity can set (<see cref="MatQuotaUnits"/>: <paramref name="unit"/> and <paramref name="period"/>). It has no default: the app's
+    /// own setting applies when MatIdentity sets none (<see cref="MatAccess.LimitAsync"/>).
+    /// </summary>
+    public MatPlatformBuilder Quota(string key, string label, string unit, string? period = null, long? min = 0, long? max = null, string? hint = null)
+    {
+        _quotas.Add(new MatQuota(key, label, unit) { Period = period, Min = min, Max = max, Hint = hint });
+        return this;
+    }
+
     /// <summary>A capability the app offers to the other apps (docs/PLATFORM.md "Capabilities"); <paramref name="label"/>: what it is in words, for the Connections area.</summary>
     public MatPlatformBuilder Provides(string capability, int version = 1, string? label = null)
     {
@@ -113,9 +135,9 @@ public sealed class MatPlatformBuilder
     }
 
     /// <summary>An icon on the home screen of a shell: <paramref name="icon"/> and <paramref name="url"/> relative to the app (docs/PLATFORM.md "Contributions").</summary>
-    public MatPlatformBuilder Launcher(string id, string label, string icon, string url, string? audience = null, string? badge = null, string? accent = null)
+    public MatPlatformBuilder Launcher(string id, string label, string icon, string url, string? audience = null, string? badge = null, string? accent = null, IReadOnlyList<string>? roles = null)
     {
-        _launchers.Add(new MatLauncher(id, label, icon, url) { Audience = audience, Badge = badge, Accent = accent });
+        _launchers.Add(new MatLauncher(id, label, icon, url) { Audience = audience, Badge = badge, Accent = accent, Roles = roles is { Count: > 0 } ? roles : null });
         return this;
     }
 
@@ -153,6 +175,8 @@ public sealed class MatPlatformBuilder
                 ? null
                 : new MatContributions { Launchers = [.. _launchers], Widgets = [.. _widgets], QuickActions = [.. _quickActions] },
             Roles = _roles.Count == 0 ? null : [.. _roles],
+            Permissions = _permissions.Count == 0 ? null : [.. _permissions],
+            Quotas = _quotas.Count == 0 ? null : [.. _quotas],
             Endpoints = MatPlatformEndpoints.Paths,
         };
     }

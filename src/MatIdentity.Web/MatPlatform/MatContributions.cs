@@ -1,4 +1,4 @@
-// MatPlatform 2.2.0 – a copy from MatDesign, do not edit here
+// MatPlatform 2.4.0 – a copy from MatDesign, do not edit here
 using System.Text.Json.Serialization;
 
 namespace MatPlatform;
@@ -44,6 +44,9 @@ public sealed record MatLauncher(string Id, string Label, string Icon, string Ur
 
     /// <summary><see cref="MatAudience"/>; null = everyone.</summary>
     public string? Audience { get; init; }
+
+    /// <summary>2.4.0: the role keys of the app whose people see it, on top of <see cref="Audience"/> (null: no narrowing). A shell that does not know the person's role reads <see cref="Audience"/> alone.</summary>
+    public IReadOnlyList<string>? Roles { get; init; }
 
     /// <summary>A key of <c>state</c> whose number sits on the corner of the icon (unread mails).</summary>
     public string? Badge { get; init; }
@@ -94,6 +97,9 @@ public sealed record MatWidget(string Id, string Label, string Kind, string Size
 
     /// <summary><see cref="MatAudience"/>; null = everyone.</summary>
     public string? Audience { get; init; }
+
+    /// <summary>2.4.0: the role keys of the app whose people see it, on top of <see cref="Audience"/> (null: no narrowing). A shell that does not know the person's role reads <see cref="Audience"/> alone.</summary>
+    public IReadOnlyList<string>? Roles { get; init; }
 }
 
 /// <summary>An entry of the menu of a launcher: an address of the app or a post action.</summary>

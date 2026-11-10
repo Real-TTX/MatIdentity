@@ -1,3 +1,4 @@
+using MatIdentity.Core.Access;
 using MatIdentity.Core.Data;
 using MatIdentity.Core.Entities;
 using MatIdentity.Core.Security;
@@ -12,11 +13,48 @@ public sealed class UserService
 
     private readonly MatIdentityDbContext _db;
     private readonly IPasswordHasher _passwordHasher;
+    private readonly PermissionService? _permissions;
 
-    public UserService(MatIdentityDbContext db, IPasswordHasher passwordHasher)
+    public UserService(MatIdentityDbContext db, IPasswordHasher passwordHasher, PermissionService? permissions = null)
     {
         _db = db;
         _passwordHasher = passwordHasher;
+        _permissions = permissions;
+    }
+
+    /// <summary>The person a SCIM client knows by <paramref name="externalId"/>.</summary>
+    public Task<User?> GetByExternalIdAsync(string externalId, CancellationToken ct = default)
+        => _db.Users.FirstOrDefaultAsync(u => u.ExternalId == externalId, ct);
+
+    /// <summary>The person with this e-mail address (case does not matter).</summary>
+    public Task<User?> GetByEmailAsync(string email, CancellationToken ct = default)
+    {
+        var normalized = email.Trim().ToLowerInvariant();
+        return _db.Users.FirstOrDefaultAsync(u => u.Email != null && u.Email.ToLower() == normalized, ct);
+    }
+
+    /// <summary>Sets the id a SCIM client keeps for the person.</summary>
+    public async Task SetExternalIdAsync(long id, string? externalId, CancellationToken ct = default)
+    {
+        if (await _db.Users.FirstOrDefaultAsync(u => u.Id == id, ct) is { } user)
+        {
+            user.ExternalId = string.IsNullOrWhiteSpace(externalId) ? null : externalId.Trim();
+            await _db.SaveChangesAsync(ct);
+        }
+    }
+
+    /// <summary>Changes the user name (a SCIM client renamed the person); false when it is taken.</summary>
+    public async Task<bool> SetUsernameAsync(long id, string username, CancellationToken ct = default)
+    {
+        var wanted = username.Trim();
+        if (await UsernameExistsAsync(wanted, id, ct) || await _db.Users.FirstOrDefaultAsync(u => u.Id == id, ct) is not { } user)
+        {
+            return false;
+        }
+
+        user.Username = wanted;
+        await _db.SaveChangesAsync(ct);
+        return true;
     }
 
     public Task<List<User>> GetAllAsync(CancellationToken ct = default)
@@ -62,6 +100,19 @@ public sealed class UserService
     }
 
     public async Task<bool> UpdateAsync(long id, string displayName, string? email, UserRole role, bool isActive, string? newPassword, CancellationToken ct = default)
+    {
+        if (_permissions is null)
+        {
+            return await UpdateCoreAsync(id, displayName, email, role, isActive, newPassword, ct);
+        }
+
+        // Administrator or not, active or not: the apps hear of what changes for the person there.
+        var done = false;
+        await _permissions.WatchAsync(null, [id], async () => done = await UpdateCoreAsync(id, displayName, email, role, isActive, newPassword, ct), ct);
+        return done;
+    }
+
+    private async Task<bool> UpdateCoreAsync(long id, string displayName, string? email, UserRole role, bool isActive, string? newPassword, CancellationToken ct)
     {
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == id, ct);
         if (user is null)

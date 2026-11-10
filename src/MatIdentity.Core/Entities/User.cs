@@ -16,6 +16,9 @@ public class User : AuditableEntity
     /// <summary>Optional; the apps use it to link an existing local account on the first sign-in.</summary>
     public string? Email { get; set; }
 
+    /// <summary>The id a SCIM client (a company's directory) keeps for the person (<c>externalId</c>); null when none set it.</summary>
+    public string? ExternalId { get; set; }
+
     /// <summary>PBKDF2 hash produced by <c>IPasswordHasher</c> (never the plain password).</summary>
     public string PasswordHash { get; set; } = string.Empty;
 

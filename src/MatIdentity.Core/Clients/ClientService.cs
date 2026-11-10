@@ -186,6 +186,11 @@ public sealed class ClientService
             await _permissions.SaveRolesAsync(clientId, upsert.Roles, ct);
         }
 
+        if (upsert.Permissions is not null || upsert.Quotas is not null)
+        {
+            await _permissions.SaveCatalogAsync(clientId, upsert.Permissions, upsert.Quotas, ct);
+        }
+
         // The apps it may call by name (also MatIdentity's own API, which "every app" leaves out).
         if (upsert.CallTargets is not null)
         {
@@ -213,6 +218,11 @@ public sealed class ClientService
     {
         ArgumentNullException.ThrowIfNull(upsert);
         var errors = upsert.Roles is null ? new Dictionary<string, string>() : PermissionService.ValidateRoles(upsert.Roles);
+        foreach (var (key, message) in PermissionService.ValidateCatalog(upsert.Permissions, upsert.Quotas))
+        {
+            errors[key] = message;
+        }
+
         if (!ClientRules.IsValidClientId(upsert.ClientId))
         {
             errors["clientId"] = "Use 2 to 63 small letters, digits, - or _, starting with a letter or digit.";

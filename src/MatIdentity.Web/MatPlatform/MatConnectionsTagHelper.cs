@@ -1,4 +1,4 @@
-// MatPlatform 2.2.0 – a copy from MatDesign, do not edit here
+// MatPlatform 2.4.0 – a copy from MatDesign, do not edit here
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
@@ -142,9 +142,12 @@ public sealed class MatConnectionsTagHelper(MatConnections connections, MatPlatf
                 return;
             }
 
-            Section(T("Nutzt", "Uses"), T(
-                "Was diese App von anderen Apps bekommt. Mattiverse verbindet sie von selbst; ohne Mattiverse trägst du die Werte hier ein oder setzt die Variablen.",
-                "What this app gets from other apps. Mattiverse connects them by itself; without it, enter the values here or set the variables."));
+            // "enter the values here" only where a form follows: the capabilities of the engines are set with their variables only (MatCapabilitySpec.ByHand)
+            Section(T("Nutzt", "Uses"), uses.Any(u => u.ByHand)
+                ? T("Was diese App von anderen Apps bekommt. Mattiverse verbindet sie von selbst; ohne Mattiverse trägst du die Werte hier ein oder setzt die Variablen.",
+                    "What this app gets from other apps. Mattiverse connects them by itself; without it, enter the values here or set the variables.")
+                : T("Was diese App von anderen Apps bekommt. Mattiverse verbindet sie von selbst; ohne Mattiverse setzt du die Variablen.",
+                    "What this app gets from other apps. Mattiverse connects them by itself; without it, set the variables."));
             _html.Append("<table class=\"mat-table\"><thead><tr><th>").Append(E(T("Wofür", "For"))).Append("</th><th>").Append(E(T("Verbunden mit", "Connected to")))
                 .Append("</th><th>").Append(E(T("Gesetzt", "Set"))).Append("</th></tr></thead><tbody>");
             foreach (var use in uses)

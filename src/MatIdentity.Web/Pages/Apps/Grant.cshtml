@@ -1,0 +1,78 @@
+@page
+@model MatIdentity.Web.Pages.Apps.GrantModel
+@{
+    ViewData["Title"] = Model.App.DisplayName;
+    ViewData["PageSub"] = "What " + Model.Who + " is given in the app.";
+    ViewData["Crumbs"] = Crumbs.Of(("Apps", "/Apps"), (Model.App.DisplayName, "/Apps/Edit?id=" + Model.Id), ("Access", "/Apps/Access?id=" + Model.Id), (Model.Who, null));
+    ViewData["Width"] = "narrow";
+    var fromRole = Model.AppPermissions.Where(p => (p.Roles ?? []).Contains(Model.EffectiveRole)).Select(p => p.Key).ToHashSet();
+}
+
+<tab-bar model="Model.Tabs" label="@Model.App.DisplayName" />
+
+<form method="post" asp-route-id="@Model.Id" asp-route-grant="@Model.GrantId" class="mat-form" novalidate>
+    <partial name="_ValidationSummary" />
+    <div class="mat-card">
+        <div class="mat-card__head"><icon name="@(Model.Grant.GroupId is null ? "user" : "layers")" /><span class="mat-card__title">@Model.Who</span></div>
+        <div class="mat-card__body mat-stack">
+            <mat-field label="Role" for-id="grant-role">
+                <select class="mat-select" id="grant-role" name="Role">
+                    <option value="">Default (@Model.Roles[^1].Label)</option>
+                    @foreach (var r in Model.Roles)
+                    {
+                        <option value="@r.Key" selected="@(Model.Role == r.Key)">@r.Label</option>
+                    }
+                </select>
+            </mat-field>
+
+            @if (Model.AppPermissions.Count > 0)
+            {
+                <fieldset class="mat-field mat-fieldset">
+                    <legend class="mat-label">Permissions</legend>
+                    <div class="mat-options">
+                        @foreach (var p in Model.AppPermissions)
+                        {
+                            <label class="mat-check">
+                                <input type="checkbox" name="Permissions" value="@p.Key" checked="@(Model.Permissions.Contains(p.Key) || fromRole.Contains(p.Key))" disabled="@fromRole.Contains(p.Key)" />
+                                <span class="mat-check__text">@p.Label@if (fromRole.Contains(p.Key)) { <span class="mat-muted"> (comes with the role)</span> }</span>
+                            </label>
+                        }
+                    </div>
+                    <span class="mat-hint">On top of the role. Permissions given to a group of the person add up with these.</span>
+                </fieldset>
+            }
+
+            @foreach (var q in Model.AppQuotas)
+            {
+                var error = ViewData.ModelState[$"Quota[{q.Key}]"]?.Errors.FirstOrDefault()?.ErrorMessage;
+                <div class="mat-field">
+                    <label class="mat-label" for="quota-@q.Key">@q.Label (@GrantModel.UnitOf(q))</label>
+                    <input class="mat-input" type="text" inputmode="decimal" id="quota-@q.Key" name="Quota[@q.Key]" value="@Model.Quota.GetValueOrDefault(q.Key)"
+                           placeholder="The app's own setting" aria-invalid="@(error is null ? "false" : "true")" />
+                    <label class="mat-check">
+                        <input type="checkbox" name="Unlimited" value="@q.Key" checked="@Model.Unlimited.Contains(q.Key)" />
+                        <span class="mat-check__text">No limit</span>
+                    </label>
+                    @if (error is not null)
+                    {
+                        <span class="mat-field__error">@error</span>
+                    }
+                    else if (!string.IsNullOrEmpty(q.Hint))
+                    {
+                        <span class="mat-hint">@q.Hint</span>
+                    }
+                </div>
+            }
+
+            @if (Model.AppQuotas.Count > 0)
+            {
+                <p class="mat-muted">An empty quota is the app's own setting. Without a value of the person's own, the largest value of their groups counts.</p>
+            }
+        </div>
+    </div>
+
+    <div class="mat-btn-row">
+        <button type="submit" class="mat-btn mat-btn--primary"><icon name="save" /><span>Save</span></button>
+        <a class="mat-btn mat-btn--secondary" href="/Apps/Access?id=@Uri.EscapeDataString(Model.Id)"><icon name="back" /><span>Back</span></a>
+    </div>
+</form>

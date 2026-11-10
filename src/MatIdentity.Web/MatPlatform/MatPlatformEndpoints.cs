@@ -1,4 +1,4 @@
-// MatPlatform 2.2.0 – a copy from MatDesign, do not edit here
+// MatPlatform 2.4.0 – a copy from MatDesign, do not edit here
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Threading.RateLimiting;
@@ -22,7 +22,7 @@ public static class MatPlatformEndpoints
     public const string AnonymousRateLimit = "matplatform-anonymous";
 
     /// <summary>The paths the platform implements, as <c>GET /api</c> lists them.</summary>
-    public static readonly IReadOnlyList<string> Paths = ["/api/health", "/api/state", "/api/configure", "/api/actions", "/api/bindings", "/api/connections", "/api/widgets"];
+    public static readonly IReadOnlyList<string> Paths = ["/api/health", "/api/state", "/api/configure", "/api/actions", "/api/bindings", "/api/connections", "/api/widgets", "/api/quotas"];
 
     /// <summary>
     /// Registers the platform: the description of the app (<paramref name="describe"/>), the settings from the environment (<c>MAT_API_KEY</c>,
@@ -54,6 +54,11 @@ public static class MatPlatformEndpoints
         builder.Services.AddSingleton<MatBindingStore>();
         builder.Services.AddSingleton<MatBindings>();
         builder.Services.AddScoped<MatConnections>();
+
+        // 2.4.0: the people: what MatIdentity said about each (MatAccess) and the reader of people.scim (MatPeople).
+        builder.Services.AddSingleton<MatAccess>();
+        builder.Services.AddHttpClient(MatPeople.HttpClientName);
+        builder.Services.AddSingleton<MatPeople>();
 
         // Per caller address: a consumer that polls every few seconds is fine, a flood is not.
         builder.Services.AddRateLimiter(limiter =>
@@ -89,10 +94,11 @@ public static class MatPlatformEndpoints
         found |= Register<IMatPlatformActions>();
         found |= Register<IMatPlatformHealth>();
         found |= Register<IMatPlatformWidgets>();
+        found |= Register<IMatPlatformQuotas>();
 
         return found
             ? services
-            : throw new InvalidOperationException($"{typeof(TApp).Name} implements none of IMatPlatformState, IMatPlatformConfiguration, IMatPlatformActions, IMatPlatformHealth, IMatPlatformWidgets.");
+            : throw new InvalidOperationException($"{typeof(TApp).Name} implements none of IMatPlatformState, IMatPlatformConfiguration, IMatPlatformActions, IMatPlatformHealth, IMatPlatformWidgets, IMatPlatformQuotas.");
 
         bool Register<TInterface>()
             where TInterface : class
@@ -223,6 +229,36 @@ public static class MatPlatformEndpoints
             return result is null
                 ? Errors(id, call.T("Diese Aktion gibt es nicht.", "There is no such action."), StatusCodes.Status404NotFound)
                 : Results.Json(result, json, statusCode: result.Ok ? StatusCodes.Status200OK : StatusCodes.Status409Conflict);
+        });
+
+        // 2.4.0: what a person uses of the quotas; only for the key or a machine, never a person's token (one person's usage is not another's business).
+        api.MapGet("/quotas/{subject}", async (string subject, HttpContext http, MatPlatformOptions options, MatAccess access, CancellationToken ct) =>
+        {
+            var call = Call(http, options);
+            if (!MatApiAccess.IsMachine(http))
+            {
+                return Errors(string.Empty, call.T("Nur mit dem Schlüssel oder dem Token einer Maschine.", "Only with the key or the token of a machine."), StatusCodes.Status403Forbidden);
+            }
+
+            var quotas = options.Definition(call.Language, new MatAuthInfo(false, null)).Quotas ?? [];
+            var usage = quotas.Count > 0 && http.RequestServices.GetService<IMatPlatformQuotas>() is { } source
+                ? await source.GetUsageAsync(subject, call, ct)
+                : null;
+            if (usage is null)
+            {
+                return Errors(subject, call.T("Diese Person kennt die App nicht.", "The app does not know this person."), StatusCodes.Status404NotFound);
+            }
+
+            var person = await access.GetAsync(subject, ct);
+            var values = new Dictionary<string, MatQuotaReportValue>(StringComparer.Ordinal);
+            foreach (var quota in quotas)
+            {
+                var own = usage.TryGetValue(quota.Key, out var used) ? used : null;
+                var isFixed = person is { Decided: true } && person.Quotas.ContainsKey(quota.Key);
+                values[quota.Key] = new MatQuotaReportValue(own?.Used ?? 0, isFixed ? person!.Quotas[quota.Key] : own?.Limit, isFixed, quota.Period);
+            }
+
+            return Results.Json(new MatQuotaReport(subject, values), json);
         });
 
         // 2.0: the bindings for a broker, GET /api/connections, the rows of the list widgets and the form of the Connections area.

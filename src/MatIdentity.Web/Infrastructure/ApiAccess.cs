@@ -28,6 +28,10 @@ public sealed class ApiAccess
 
     public bool KeyEnabled => _key is not null;
 
+    /// <summary>The key, compared in constant time (SCIM clients send it as <c>Authorization: Bearer</c>).</summary>
+    public bool IsKey(string? value)
+        => _key is not null && value is not null && CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(value.Trim()), _key);
+
     /// <summary>The name of the caller for the activity list and the audit columns, or null when it may not call.</summary>
     public async Task<string?> AuthenticateAsync(HttpContext http)
     {

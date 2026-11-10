@@ -88,6 +88,31 @@ itself). The roles of an app are the field `roles` of its MatApiDefinition (read
 sent through the client API, or written down; without any, `admin` and `user`. Machine tokens follow `AppPolicy.CallsAllApps` and `AppCallGrant`: `ClientService.SyncCallScopesAsync` writes
 the allowed `app:<id>` scopes into the permissions of the OpenIddict application.
 
+**Permissions and quotas** (MatDesign docs/ACCESS.md, PLATFORM.md "People, permissions and quotas"). An app names them in its MatApiDefinition next to its roles
+(`permissions`: rights on top of a role, some of them coming with roles; `quotas`: numbers per person with a unit and maybe a period); MatIdentity reads them with the roles
+(`AppRolesReader.ReadCatalogAsync`, kept in `AppPermission` and `AppQuota`). A grant (`AppGrant`) gives on top of its role a list of permissions and a JSON object of quotas
+(`GrantValues`; `null` = no limit). What a person ends up with (`AccessDecision`): the permissions **add up** (the role's, their own grant's, every group's); a quota is
+their own grant's value, else the **largest** of their groups' (no limit wins), else none, which means the app's own setting. With the role they go into the ID token, the
+access token and the user info as `entitlements` (RFC 9068) and `mat_quotas`, each app only its own; with `RoleMode.App` none of the three. The decision reads everything it
+needs at once (`PermissionService.LoadAsync`, then `Decide` in memory), so a whole snapshot of who has what is cheap.
+
+**A change reaches the app at once.** Every change that can change what someone ends up with goes through `PermissionService.WatchAsync`: a grant, the rules, the roles,
+permissions or quotas of an app, the members of a group, a person's administrator flag or account. It takes a snapshot of the decisions (the signature of each) before and
+after, and for every person and app that differ it revokes the person's refresh tokens for that app (`TokenRevoker.RevokeForSubjectAndClientAsync`) and tells
+`IAccessChangeListener`: the web project's `BackchannelLogout` sends that app a logout token with the subject alone. The app ends the person's sessions, and the next request
+signs them in again without a password, with the new claims. (OpenIddict keeps the type of a token as its URN, `urn:ietf:params:oauth:token-type:refresh_token`; the revoker
+compares both forms.)
+
+**SCIM 2.0** (RFC 7643, 7644) at `/scim/v2` (`Infrastructure/ScimEndpoints.cs`, the changes of a person in `ScimPeople`, the same as the pages of People): `Users` (id = the
+subject), `Groups` (id = the number), `ServiceProviderConfig`, `Schemas`, `ResourceTypes`. Filters `attribute eq "value"` only, paging, `PATCH` add/replace/remove (also the
+way Entra ID writes it: `"Replace"`, `"False"`), no bulk, no sorting, no ETags. The extension `urn:mat:scim:schemas:extension:access:1.0:User` / `:Group` carries the `grants`
+(written as a whole) and, read only, `access` (what the person ends up with per app, with `via`) and `administrator`; the core `roles` and `entitlements` carry the same with the
+app as `type`. MatIdentity's key (`X-Api-Key` or bearer) reads and writes everything (`X-Mat-Actor: <sub>` names the person who acted, for the activity list); the key of a
+binding of **`people.scim`** (a key capability MatIdentity provides; MatPlatform's generic handler) only reads, and only the people who may use that app with their values
+there. The last active administrator can be neither disabled, demoted nor deleted. What SCIM has no word for is `POST /api/v1/people/{subject}/actions/{action}`
+(`invite`, `resetPassword`, `signOut`, `unlock`, `resetSecondStep`), and `GET /api/v1/clients` answers each app with its role mode, *open to everyone*, roles,
+permissions and quotas (what a shell draws its forms from).
+
 ## The second step
 
 Optional for everyone. Who has an authenticator app (`TotpEnabled`) or a passkey is asked for it after the password (`TwoFactorService.NeedsSecondStepAsync`).
@@ -121,7 +146,8 @@ OpenID Connect Back-Channel Logout 1.0. The ID token carries `sid`, the public i
 token). A session remembers the apps it signed in to (`UserSession.ClientIds`). Whenever sessions end, `SessionService` tells its `ISessionEndListener`;
 the web project's `BackchannelLogout` sends every app with a sign-out address (`BackchannelLogoutUri`) a logout token (JWT `logout+jwt`, signed with the key
 of the ID tokens, `iss`, `aud`, `sub`, `sid`, `events`, `jti`, two minutes) after the answer; a person out everywhere (disabled, new password set by an
-administrator, signed out by one) is announced to every such app with `sub` alone. Front-channel logout is not offered: its iframes need third-party
+administrator, signed out by one) is announced to every such app with `sub` alone. A change of what a person is given in an app (see "Permissions") is announced to that
+app the same way. Front-channel logout is not offered: its iframes need third-party
 cookies. A `GET /connect/logout` without the person's `id_token_hint` asks first (a link from another site must not sign anyone out).
 
 ## Brute force

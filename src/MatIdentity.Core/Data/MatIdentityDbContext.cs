@@ -34,6 +34,8 @@ public class MatIdentityDbContext : DbContext
     public DbSet<AppRole> AppRoles => Set<AppRole>();
     public DbSet<AppGrant> AppGrants => Set<AppGrant>();
     public DbSet<AppCallGrant> AppCallGrants => Set<AppCallGrant>();
+    public DbSet<AppPermission> AppPermissions => Set<AppPermission>();
+    public DbSet<AppQuota> AppQuotas => Set<AppQuota>();
     public DbSet<AccountToken> AccountTokens => Set<AccountToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -52,6 +54,7 @@ public class MatIdentityDbContext : DbContext
             e.Property(x => x.Theme).HasMaxLength(16).IsRequired();
             e.Property(x => x.TotpSecret).HasMaxLength(1000);
             e.Property(x => x.RecoveryCodeHashes).HasMaxLength(1000);
+            e.Property(x => x.ExternalId).HasMaxLength(256);
             e.Property(x => x.Role).HasConversion<int>();
             e.HasIndex(x => x.Subject).IsUnique();
             // Unique only among non-deleted rows, so a username can be reused after a soft delete.
@@ -108,6 +111,7 @@ public class MatIdentityDbContext : DbContext
             e.HasKey(x => x.Id);
             e.Property(x => x.Name).HasMaxLength(100).IsRequired();
             e.Property(x => x.Description).HasMaxLength(500);
+            e.Property(x => x.ExternalId).HasMaxLength(256);
             e.HasIndex(x => x.Name).IsUnique().HasFilter("\"UpdateState\" <> 0");
             e.HasQueryFilter(x => x.UpdateState != UpdateState.Deleted);
         });
@@ -150,11 +154,40 @@ public class MatIdentityDbContext : DbContext
             e.HasKey(x => x.Id);
             e.Property(x => x.ClientId).HasMaxLength(100).IsRequired();
             e.Property(x => x.RoleKey).HasMaxLength(64);
+            e.Property(x => x.Permissions).HasMaxLength(4000);
+            e.Property(x => x.Quotas).HasMaxLength(4000);
             e.HasIndex(x => x.ClientId);
             e.HasIndex(x => x.UserId);
             e.HasIndex(x => x.GroupId);
             e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(x => x.Group).WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Cascade);
+            e.HasQueryFilter(x => x.UpdateState != UpdateState.Deleted);
+        });
+
+        modelBuilder.Entity<AppPermission>(e =>
+        {
+            e.ToTable("AppPermission");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.ClientId).HasMaxLength(100).IsRequired();
+            e.Property(x => x.Key).HasMaxLength(64).IsRequired();
+            e.Property(x => x.Label).HasMaxLength(100).IsRequired();
+            e.Property(x => x.Hint).HasMaxLength(300);
+            e.Property(x => x.Roles).HasMaxLength(2000);
+            e.HasIndex(x => new { x.ClientId, x.Key }).IsUnique().HasFilter("\"UpdateState\" <> 0");
+            e.HasQueryFilter(x => x.UpdateState != UpdateState.Deleted);
+        });
+
+        modelBuilder.Entity<AppQuota>(e =>
+        {
+            e.ToTable("AppQuota");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.ClientId).HasMaxLength(100).IsRequired();
+            e.Property(x => x.Key).HasMaxLength(64).IsRequired();
+            e.Property(x => x.Label).HasMaxLength(100).IsRequired();
+            e.Property(x => x.Unit).HasMaxLength(16).IsRequired();
+            e.Property(x => x.Period).HasMaxLength(16);
+            e.Property(x => x.Hint).HasMaxLength(300);
+            e.HasIndex(x => new { x.ClientId, x.Key }).IsUnique().HasFilter("\"UpdateState\" <> 0");
             e.HasQueryFilter(x => x.UpdateState != UpdateState.Deleted);
         });
 

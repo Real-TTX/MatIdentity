@@ -87,6 +87,12 @@ public sealed record ClientUpsert
     /// <summary>The roles of the app, the most powerful first.</summary>
     public IReadOnlyList<RoleInfo>? Roles { get; init; }
 
+    /// <summary>The permissions of the app (rights on top of a role), as a whole; null keeps them.</summary>
+    public IReadOnlyList<PermissionInfo>? Permissions { get; init; }
+
+    /// <summary>The quotas of the app (numbers per person), as a whole; null keeps them.</summary>
+    public IReadOnlyList<QuotaInfo>? Quotas { get; init; }
+
     public bool? OpenToEveryone { get; init; }
 
     public bool? CallsAllApps { get; init; }

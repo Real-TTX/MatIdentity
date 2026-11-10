@@ -54,6 +54,7 @@ public static class Paths
     public static bool IsOpenBeforeSignIn(PathString path)
         => Static.Any(p => path.StartsWithSegments(p))
            || path.StartsWithSegments("/api")
+           || path.StartsWithSegments("/scim")
            || path.StartsWithSegments("/.well-known")
            || path.StartsWithSegments("/connect/token")
            || path.StartsWithSegments("/connect/userinfo")

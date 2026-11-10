@@ -47,6 +47,12 @@ public class AccessModel : PageModel
 
     public IReadOnlyList<AppGrant> Grants { get; private set; } = [];
 
+    /// <summary>The permissions of the app (rights on top of a role), as it names them in its /api.</summary>
+    public IReadOnlyList<PermissionInfo> AppPermissions { get; private set; } = [];
+
+    /// <summary>The quotas of the app (numbers per person), as it names them in its /api.</summary>
+    public IReadOnlyList<QuotaInfo> AppQuotas { get; private set; } = [];
+
     /// <summary>What can still be given the app: groups first, then people (<c>g:3</c>, <c>u:12</c>).</summary>
     public IReadOnlyList<(string Value, string Label)> Candidates { get; private set; } = [];
 
@@ -105,24 +111,29 @@ public class AccessModel : PageModel
             return NotFound();
         }
 
-        var (roles, error) = await _rolesReader.ReadAsync(App, HttpContext.RequestAborted);
-        if (roles is null)
+        var catalog = await _rolesReader.ReadCatalogAsync(App, HttpContext.RequestAborted);
+        if (!catalog.Succeeded || catalog.Roles is not { } roles)
         {
-            StatusMessage = error;
+            StatusMessage = catalog.Error ?? $"{App.HomeUrl?.TrimEnd('/')}/api names no roles (the field \"roles\" of the MatApiDefinition).";
             IsError = true;
             return RedirectToPage(new { id = Id });
         }
 
         var errors = await _permissions.SaveRolesAsync(Id, roles, HttpContext.RequestAborted);
+        if (errors.Count == 0)
+        {
+            errors = await _permissions.SaveCatalogAsync(Id, catalog.Permissions, catalog.Quotas, HttpContext.RequestAborted);
+        }
+
         if (errors.Count > 0)
         {
-            StatusMessage = "The app named roles MatIdentity cannot use: " + errors.Values.First();
+            StatusMessage = "The app named roles, permissions or quotas MatIdentity cannot use: " + errors.Values.First();
             IsError = true;
             return RedirectToPage(new { id = Id });
         }
 
-        await LogAsync("Roles read from the app: " + string.Join(", ", roles.Select(r => r.Key)));
-        return Done($"{roles.Count} roles read from the app.");
+        await LogAsync($"Read from the app: roles {string.Join(", ", roles.Select(r => r.Key))}; {catalog.Permissions.Count} permissions, {catalog.Quotas.Count} quotas");
+        return Done($"Read from the app: {roles.Count} roles, {catalog.Permissions.Count} permissions, {catalog.Quotas.Count} quotas.");
     }
 
     public async Task<IActionResult> OnPostGrantAsync(string? principal, string? role)
@@ -192,6 +203,18 @@ public class AccessModel : PageModel
 
     private string? ValidRole(string? role) => Roles.Any(r => r.Key == role) ? role : null;
 
+    /// <summary>What a grant gives on top of its role, in a few words ("export · Storage 50 GB"), or null.</summary>
+    public string? Summary(AppGrant grant)
+    {
+        var values = GrantValues.Of(grant);
+        var parts = AppPermissions.Where(p => values.Permissions.Contains(p.Key)).Select(p => p.Label)
+            .Concat(AppQuotas.Where(q => values.Quotas.ContainsKey(q.Key)).Select(q => values.Quotas[q.Key] is { } value
+                ? $"{q.Label} {GrantModel.Show(q, value)} {GrantModel.UnitOf(q)}"
+                : $"{q.Label} without limit"))
+            .ToList();
+        return parts.Count == 0 ? null : string.Join(" · ", parts);
+    }
+
     private async Task LogAsync(string detail)
         => await _activity.WriteAsync(ActivityKind.ClientChanged, username: User.GetUsername(), clientId: Id,
             ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString(), detail: detail, ct: HttpContext.RequestAborted);
@@ -216,6 +239,8 @@ public class AccessModel : PageModel
         Roles = await _permissions.RolesAsync(Id, ct);
         HasOwnRoles = !ReferenceEquals(Roles, PermissionService.DefaultRoles);
         Grants = await _permissions.GrantsAsync(Id, ct);
+        AppPermissions = await _permissions.PermissionsAsync(Id, ct);
+        AppQuotas = await _permissions.QuotasAsync(Id, ct);
         if (!keepInput)
         {
             RoleMode = Policy.RoleMode;

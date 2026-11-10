@@ -65,7 +65,7 @@ public sealed partial class IdentityBindingTests
         }))).StatusCode;
 
     [Fact]
-    public async Task The_definition_is_valid_and_offers_identity_oidc_and_uses_mail_smtp()
+    public async Task The_definition_is_valid_and_offers_identity_oidc_and_people_scim_and_uses_mail_smtp()
     {
         var sprite = MatPlatformValidator.ReadSprite(Path.Combine(WebRoot(), "matui", "matui-icons.svg"));
         foreach (var smtp in new[] { new MatSmtpSettings(), new MatSmtpSettings { Host = "matsmtp", FromAddress = "id@example.test" } })
@@ -85,7 +85,10 @@ public sealed partial class IdentityBindingTests
             var json = await (await _site.CreateClient().SendAsync(request)).Content.ReadAsStringAsync();
             Assert.Empty(MatPlatformValidator.Validate(json, sprite));
             using var doc = JsonDocument.Parse(json);
-            var provided = Assert.Single(doc.RootElement.GetProperty("provides").EnumerateArray());
+            // identity.oidc first; people.scim (2.4.0) lets the apps read their people.
+            var provides = doc.RootElement.GetProperty("provides").EnumerateArray().ToList();
+            Assert.Equal([MatCapabilities.IdentityOidc, MatPeople.Capability], provides.Select(p => p.GetProperty("capability").GetString()));
+            var provided = provides[0];
             Assert.Equal(MatCapabilities.IdentityOidc, provided.GetProperty("capability").GetString());
             Assert.Equal(1, provided.GetProperty("version").GetInt32());
             Assert.Equal(label, provided.GetProperty("label").GetString());

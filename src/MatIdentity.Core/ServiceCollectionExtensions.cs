@@ -44,6 +44,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ActivityService>();
         services.AddScoped<ClientService>();
         services.AddScoped<TokenRevoker>();
+        services.TryAddScoped<MatIdentity.Core.Access.IAccessChangeListener, MatIdentity.Core.Access.NoAccessChangeListener>();
         services.AddScoped<MatIdentity.Core.Access.PermissionService>();
         services.AddScoped<MatIdentity.Core.Access.GroupService>();
         services.AddScoped<ConfigurationExport>();

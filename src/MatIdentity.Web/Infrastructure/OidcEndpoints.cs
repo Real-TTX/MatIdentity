@@ -24,6 +24,12 @@ public static class OidcEndpoints
     /// <summary>The claim <c>sid</c> (OpenID Connect Front-/Back-Channel Logout): the public id of the session at MatIdentity.</summary>
     public const string SessionIdClaim = "sid";
 
+    /// <summary>The permissions of the person in the app (RFC 9068 2.2.3.1; MatDesign docs/PLATFORM.md "People, permissions and quotas").</summary>
+    public const string EntitlementsClaim = "entitlements";
+
+    /// <summary>The quotas MatIdentity set for the person in the app: a JSON object, null = no limit.</summary>
+    public const string QuotasClaim = "mat_quotas";
+
     public static void MapOidcEndpoints(this WebApplication app)
     {
         app.MapMethods("/connect/authorize", [HttpMethods.Get, HttpMethods.Post], AuthorizeAsync).AllowAnonymous().DisableAntiforgery();
@@ -62,7 +68,7 @@ public static class OidcEndpoints
             return Results.Redirect("/Account/NoAccess?app=" + Uri.EscapeDataString(request.ClientId ?? string.Empty));
         }
 
-        var identity = BuildIdentity(user, request.GetScopes(), decision.Role);
+        var identity = BuildIdentity(user, request.GetScopes(), decision);
         // The session at MatIdentity (sid): the app hears of its end through its back-channel address, and it knows which of its sessions is meant.
         if (cookie.Principal?.GetSessionToken() is { } sessionToken)
         {
@@ -128,7 +134,7 @@ public static class OidcEndpoints
                 return Forbid(Errors.InvalidGrant, "The app is no longer given to this person.");
             }
 
-            var identity = BuildIdentity(user, result.Principal.GetScopes(), decision.Role);
+            var identity = BuildIdentity(user, result.Principal.GetScopes(), decision);
             identity.SetClaim(SessionIdClaim, result.Principal.GetClaim(SessionIdClaim));
             identity.SetResources(result.Principal.GetResources());
             identity.SetDestinations(Destinations);
@@ -173,6 +179,12 @@ public static class OidcEndpoints
             if (result.Principal.GetClaim(Claims.Role) is { } role)
             {
                 claims[Claims.Role] = role;
+                // The permissions and quotas come with the role (none without it: the app decides).
+                claims[EntitlementsClaim] = result.Principal.GetClaims(EntitlementsClaim).ToArray();
+                if (result.Principal.FindFirst(QuotasClaim)?.Value is { Length: > 0 } quotas)
+                {
+                    claims[QuotasClaim] = System.Text.Json.JsonDocument.Parse(quotas).RootElement.Clone();
+                }
             }
         }
 
@@ -213,8 +225,11 @@ public static class OidcEndpoints
         return Results.SignOut(new AuthenticationProperties { RedirectUri = "/Account/Login?signedOut=true" }, [OpenIddictServerAspNetCoreDefaults.AuthenticationScheme]);
     }
 
-    /// <summary>The claims of a person, by the scopes the app asked for (<c>sub</c> always).</summary>
-    internal static ClaimsIdentity BuildIdentity(User user, ImmutableArray<string> scopes, string? appRole)
+    /// <summary>
+    /// The claims of a person, by the scopes the app asked for (<c>sub</c> always), with what the rules of the app give them there: the role, the permissions
+    /// (<c>entitlements</c>) and the quotas (<c>mat_quotas</c>); none of the three when the app decides the roles itself.
+    /// </summary>
+    internal static ClaimsIdentity BuildIdentity(User user, ImmutableArray<string> scopes, AccessDecision decision)
     {
         var identity = new ClaimsIdentity(TokenValidationParameters.DefaultAuthenticationType, Claims.Name, Claims.Role);
         identity.SetClaim(Claims.Subject, user.Subject)
@@ -227,9 +242,19 @@ public static class OidcEndpoints
             identity.AddClaim(new Claim(Claims.EmailVerified, user.EmailVerified ? "true" : "false", ClaimValueTypes.Boolean));
         }
 
-        if (appRole is not null)
+        if (decision.Role is { } appRole)
         {
             identity.SetClaims(Claims.Role, [appRole]);
+            if (decision.Permissions.Count > 0)
+            {
+                identity.SetClaims(EntitlementsClaim, [.. decision.Permissions]);
+            }
+
+            if (decision.Quotas.Count > 0)
+            {
+                var quotas = System.Text.Json.JsonSerializer.Serialize(decision.Quotas.OrderBy(q => q.Key, StringComparer.Ordinal).ToDictionary(q => q.Key, q => q.Value));
+                identity.AddClaim(new Claim(QuotasClaim, quotas, Microsoft.IdentityModel.JsonWebTokens.JsonClaimValueTypes.Json));
+            }
         }
 
         identity.SetScopes(scopes);
@@ -260,7 +285,7 @@ public static class OidcEndpoints
                 yield return OpenIddictConstants.Destinations.IdentityToken;
                 yield break;
 
-            case Claims.Role when principal.HasScope(Scopes.Roles):
+            case Claims.Role or EntitlementsClaim or QuotasClaim when principal.HasScope(Scopes.Roles):
                 yield return OpenIddictConstants.Destinations.AccessToken;
                 yield return OpenIddictConstants.Destinations.IdentityToken;
                 yield break;
