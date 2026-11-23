@@ -31,6 +31,13 @@
                 <input type="checkbox" name="OpenToEveryone" value="true" checked="@Model.OpenToEveryone" />
                 <span class="mat-check__text">Everyone may sign in (with the last role), not only the people and groups below</span>
             </label>
+            <div class="mat-stack">
+                <label class="mat-check">
+                    <input type="checkbox" name="SendsGroups" value="true" checked="@Model.SendsGroups" />
+                    <span class="mat-check__text">Send the person's groups to the app (claim <span class="mat-mono">groups</span>)</span>
+                </label>
+                <span class="mat-hint">The names of all the person's groups, with the scope roles, also when the app manages the roles; the app can map them to its own groups.</span>
+            </div>
             <div class="mat-btn-row mat-btn-row--plain">
                 <button type="submit" class="mat-btn mat-btn--primary"><icon name="save" /><span>Save</span></button>
             </div>

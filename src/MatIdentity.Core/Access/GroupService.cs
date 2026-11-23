@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace MatIdentity.Core.Access;
 
-/// <summary>The groups and who is in them. A change of the members tells the apps the group is given to (<see cref="PermissionService.WatchAsync"/>).</summary>
+/// <summary>The groups and who is in them. A change of the members (or of the name) tells the apps the group is given to and the apps that are sent group names (<see cref="PermissionService.WatchAsync"/>).</summary>
 public sealed class GroupService
 {
     private readonly MatIdentityDbContext _db;
@@ -95,9 +95,11 @@ public sealed class GroupService
         await _db.SaveChangesAsync(ct);
     }
 
-    /// <summary>The apps a group is given to.</summary>
+    /// <summary>The apps a group is given to, and the apps that are sent the names of the groups (their members' claim <c>groups</c> changes too).</summary>
     private Task<List<string>> ClientsOfAsync(long groupId, CancellationToken ct)
-        => _db.AppGrants.Where(g => g.GroupId == groupId).Select(g => g.ClientId).Distinct().ToListAsync(ct);
+        => _db.AppGrants.Where(g => g.GroupId == groupId).Select(g => g.ClientId)
+            .Union(_db.AppPolicies.Where(p => p.SendsGroups).Select(p => p.ClientId))
+            .Distinct().ToListAsync(ct);
 
     /// <summary>Sets the groups of a person to exactly <paramref name="groupIds"/> (from the page of the person).</summary>
     public Task SetGroupsOfAsync(long userId, IEnumerable<long> groupIds, CancellationToken ct = default)

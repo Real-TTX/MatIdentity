@@ -63,6 +63,9 @@ public class AccessModel : PageModel
     public bool OpenToEveryone { get; set; }
 
     [BindProperty]
+    public bool SendsGroups { get; set; }
+
+    [BindProperty]
     public string? RolesText { get; set; }
 
     [TempData] public string? StatusMessage { get; set; }
@@ -80,8 +83,8 @@ public class AccessModel : PageModel
             return NotFound();
         }
 
-        await _permissions.SavePolicyAsync(Id, Enum.IsDefined(RoleMode) ? RoleMode : RoleMode.MatIdentity, OpenToEveryone, Policy.CallsAllApps, ct);
-        await LogAsync($"Roles by {(RoleMode == RoleMode.App ? "the app" : "MatIdentity")}, {(OpenToEveryone ? "open to everyone" : "only those it is given to")}");
+        await _permissions.SavePolicyAsync(Id, Enum.IsDefined(RoleMode) ? RoleMode : RoleMode.MatIdentity, OpenToEveryone, Policy.CallsAllApps, SendsGroups, ct);
+        await LogAsync($"Roles by {(RoleMode == RoleMode.App ? "the app" : "MatIdentity")}, {(OpenToEveryone ? "open to everyone" : "only those it is given to")}{(SendsGroups ? ", sends groups" : string.Empty)}");
         return Done("Saved. It takes effect at the next sign-in and at the next renewal of a token.");
     }
 
@@ -245,6 +248,7 @@ public class AccessModel : PageModel
         {
             RoleMode = Policy.RoleMode;
             OpenToEveryone = Policy.OpenToEveryone;
+            SendsGroups = Policy.SendsGroups;
             RolesText = string.Join('\n', Roles.Select(r => $"{r.Key} {r.Label}"));
         }
 

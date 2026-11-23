@@ -98,6 +98,46 @@ public sealed class PeopleAccessTests
     }
 
     [Fact]
+    public async Task An_app_that_asks_for_groups_gets_their_names_also_when_it_decides_its_roles()
+    {
+        var (clientId, secret, redirect) = await RegisterAppAsync("matpeople-groups", roleMode: "app");
+        var person = await CreatePersonAsync("people-gwen");
+        using (var scope = _site.Services.CreateScope())
+        {
+            var groups = scope.ServiceProvider.GetRequiredService<GroupService>();
+            await groups.SaveAsync(null, "Beta " + clientId, null, [person.Id]);
+            await groups.SaveAsync(null, "Alpha " + clientId, null, [person.Id]);
+            await scope.ServiceProvider.GetRequiredService<PermissionService>().SaveGrantAsync(clientId, person.Id, null, null, null);
+        }
+
+        // Off (the default): no claim groups anywhere.
+        var browser = _site.Browser();
+        await IdentityFactory.SignInAsync(browser, "/Account/Login", "people-gwen", Password);
+        var before = await CodeFlowAsync(browser, clientId, secret, redirect);
+        Assert.False(Jwt(before.GetProperty("id_token").GetString()!).TryGetProperty("groups", out _));
+        Assert.False(Jwt(before.GetProperty("access_token").GetString()!).TryGetProperty("groups", out _));
+        Assert.False((await UserInfoAsync(before)).TryGetProperty("groups", out _));
+
+        // On through the client API: the names of all the person's groups, in the id token, the access token, the user info and after a renewal.
+        var saved = await _site.Api().PutAsJsonAsync($"/api/v1/clients/{clientId}", new { sendsGroups = true });
+        Assert.True(saved.IsSuccessStatusCode, await saved.Content.ReadAsStringAsync());
+        Assert.True(JsonDocument.Parse(await _site.Api().GetStringAsync($"/api/v1/clients/{clientId}")).RootElement.GetProperty("sendsGroups").GetBoolean());
+
+        string[] expected = ["Alpha " + clientId, "Beta " + clientId];
+        var tokens = await CodeFlowAsync(browser, clientId, secret, redirect);
+        var id = Jwt(tokens.GetProperty("id_token").GetString()!);
+        Assert.Equal(expected, id.GetProperty("groups").EnumerateArray().Select(e => e.GetString()));
+        Assert.False(id.TryGetProperty("role", out _));
+        Assert.Equal(expected, Jwt(tokens.GetProperty("access_token").GetString()!).GetProperty("groups").EnumerateArray().Select(e => e.GetString()));
+        Assert.Equal(expected, (await UserInfoAsync(tokens)).GetProperty("groups").EnumerateArray().Select(e => e.GetString()));
+
+        var refreshed = await RefreshAsync(clientId, secret, tokens.GetProperty("refresh_token").GetString()!);
+        Assert.True(refreshed.IsSuccessStatusCode, await refreshed.Content.ReadAsStringAsync());
+        var renewed = JsonDocument.Parse(await refreshed.Content.ReadAsStringAsync()).RootElement;
+        Assert.Equal(expected, Jwt(renewed.GetProperty("id_token").GetString()!).GetProperty("groups").EnumerateArray().Select(e => e.GetString()));
+    }
+
+    [Fact]
     public async Task The_client_api_keeps_the_permissions_and_quotas_and_refuses_bad_ones()
     {
         await RegisterAppAsync("matpeople-c");
@@ -573,6 +613,13 @@ public sealed class PeopleAccessTests
         var text = await token.Content.ReadAsStringAsync();
         Assert.True(token.IsSuccessStatusCode, text);
         return JsonDocument.Parse(text).RootElement.Clone();
+    }
+
+    private async Task<JsonElement> UserInfoAsync(JsonElement tokens)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, "/connect/userinfo");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokens.GetProperty("access_token").GetString());
+        return JsonDocument.Parse(await (await _site.CreateClient().SendAsync(request)).Content.ReadAsStringAsync()).RootElement.Clone();
     }
 
     /// <summary>One value, written as a string or as an array of one.</summary>

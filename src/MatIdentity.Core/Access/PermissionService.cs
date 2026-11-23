@@ -16,7 +16,8 @@ namespace MatIdentity.Core.Access;
 /// </list>
 /// Permissions only add up: those the role brings, those of the person's own grant and those of every grant of their groups. A quota is the value of the person's own
 /// grant, else the largest of their groups' grants (no limit beats every number), else none (the app's own setting). When the app decides the roles itself
-/// (<see cref="RoleMode.App"/>) the token carries no role, no permissions and no quotas.
+/// (<see cref="RoleMode.App"/>) the token carries no role, no permissions and no quotas. An app whose rules say so (<see cref="AppPolicy.SendsGroups"/>) also gets
+/// the names of the person's groups (claim <c>groups</c>), whoever decides the roles.
 /// Every change that can change what a person ends up with goes through <see cref="WatchAsync"/>: the apps hear of the people whose values changed
 /// (<see cref="IAccessChangeListener"/>), and their refresh tokens for those apps are revoked.
 /// </remarks>
@@ -45,7 +46,7 @@ public sealed class PermissionService
     public async Task<AppPolicy> PolicyAsync(string clientId, CancellationToken ct = default)
         => await _db.AppPolicies.AsNoTracking().FirstOrDefaultAsync(p => p.ClientId == clientId, ct) ?? new AppPolicy { ClientId = clientId };
 
-    public Task SavePolicyAsync(string clientId, RoleMode roleMode, bool openToEveryone, bool callsAllApps, CancellationToken ct = default)
+    public Task SavePolicyAsync(string clientId, RoleMode roleMode, bool openToEveryone, bool callsAllApps, bool sendsGroups, CancellationToken ct = default)
         => WatchAsync([clientId], null, async () =>
         {
             var policy = await _db.AppPolicies.FirstOrDefaultAsync(p => p.ClientId == clientId, ct);
@@ -58,6 +59,7 @@ public sealed class PermissionService
             policy.RoleMode = roleMode;
             policy.OpenToEveryone = openToEveryone;
             policy.CallsAllApps = callsAllApps;
+            policy.SendsGroups = sendsGroups;
             await _db.SaveChangesAsync(ct);
         }, ct);
 
@@ -634,9 +636,13 @@ public sealed class PermissionService
             via.Add("administrator");
         }
 
+        // The names of the person's groups, only for an app whose rules send them (whoever decides the roles).
+        IReadOnlyList<string> groups = policy.SendsGroups
+            ? [.. groupIds.Select(id => data.GroupNames[id]).Order(StringComparer.Ordinal)]
+            : [];
         if (policy.RoleMode == RoleMode.App)
         {
-            return new AccessDecision(true, null, "The app decides the role.") { Via = via };
+            return new AccessDecision(true, null, "The app decides the role.") { Via = via, Groups = groups };
         }
 
         var rank = roles.Select((r, i) => (r.Key, i)).ToDictionary(x => x.Key, x => x.i, StringComparer.Ordinal);
@@ -681,7 +687,7 @@ public sealed class PermissionService
             }
         }
 
-        return new AccessDecision(true, role, "Allowed.") { Permissions = permissions, Quotas = quotas, Via = via };
+        return new AccessDecision(true, role, "Allowed.") { Permissions = permissions, Quotas = quotas, Via = via, Groups = groups };
     }
 
     private static PermissionInfo ToInfo(AppPermission p)

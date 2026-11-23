@@ -19,10 +19,14 @@ public sealed record AccessDecision(bool Allowed, string? Role, string Reason)
     /// <summary>Why the person may come in: <c>person</c>, <c>group:&lt;name&gt;</c>, <c>everyone</c>, <c>administrator</c>.</summary>
     public IReadOnlyList<string> Via { get; init; } = [];
 
+    /// <summary>The names of the person's groups (claim <c>groups</c>), only when the rules of the app send them (<see cref="AppPolicy.SendsGroups"/>); else empty.</summary>
+    public IReadOnlyList<string> Groups { get; init; } = [];
+
     /// <summary>What an app sees of the decision, as one text: two decisions with the same signature give the app the same claims.</summary>
     public string Signature
         => Allowed
             ? $"{Role}|{string.Join(' ', Permissions)}|{string.Join(' ', Quotas.OrderBy(q => q.Key, StringComparer.Ordinal).Select(q => $"{q.Key}={q.Value?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "-"}"))}"
+                + (Groups.Count > 0 ? "|" + string.Join('\n', Groups) : string.Empty)
             : "-";
 }
 

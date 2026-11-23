@@ -180,7 +180,8 @@ public sealed class ClientService
         var clientId = upsert.ClientId;
         var existing = await GetAsync(clientId, ct);
         var policy = await _permissions.PolicyAsync(clientId, ct);
-        await _permissions.SavePolicyAsync(clientId, upsert.RoleMode ?? policy.RoleMode, upsert.OpenToEveryone ?? policy.OpenToEveryone, upsert.CallsAllApps ?? policy.CallsAllApps, ct);
+        await _permissions.SavePolicyAsync(clientId, upsert.RoleMode ?? policy.RoleMode, upsert.OpenToEveryone ?? policy.OpenToEveryone, upsert.CallsAllApps ?? policy.CallsAllApps,
+            upsert.SendsGroups ?? policy.SendsGroups, ct);
         if (upsert.Roles is not null)
         {
             await _permissions.SaveRolesAsync(clientId, upsert.Roles, ct);

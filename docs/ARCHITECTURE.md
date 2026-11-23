@@ -93,7 +93,9 @@ the allowed `app:<id>` scopes into the permissions of the OpenIddict application
 (`AppRolesReader.ReadCatalogAsync`, kept in `AppPermission` and `AppQuota`). A grant (`AppGrant`) gives on top of its role a list of permissions and a JSON object of quotas
 (`GrantValues`; `null` = no limit). What a person ends up with (`AccessDecision`): the permissions **add up** (the role's, their own grant's, every group's); a quota is
 their own grant's value, else the **largest** of their groups' (no limit wins), else none, which means the app's own setting. With the role they go into the ID token, the
-access token and the user info as `entitlements` (RFC 9068) and `mat_quotas`, each app only its own; with `RoleMode.App` none of the three. The decision reads everything it
+access token and the user info as `entitlements` (RFC 9068) and `mat_quotas`, each app only its own; with `RoleMode.App` none of the three. An app whose rules send groups (`AppPolicy.SendsGroups`, off by default) also gets
+`groups`, the names of all the person's groups (`AccessDecision.Groups`, in the signature), with the scope `roles` and whoever decides the roles; a change of a group's
+members or name then also reaches every such app (`GroupService.ClientsOfAsync`). The decision reads everything it
 needs at once (`PermissionService.LoadAsync`, then `Decide` in memory), so a whole snapshot of who has what is cheap.
 
 **A change reaches the app at once.** Every change that can change what someone ends up with goes through `PermissionService.WatchAsync`: a grant, the rules, the roles,

@@ -137,7 +137,7 @@ public class EditModel : PageModel
         if (ClientRules.IsValidClientId(clientId))
         {
             var policy = await _permissions.PolicyAsync(clientId, HttpContext.RequestAborted);
-            await _permissions.SavePolicyAsync(clientId, policy.RoleMode, policy.OpenToEveryone, Input.AllowMachine && Input.CallsAllApps, HttpContext.RequestAborted);
+            await _permissions.SavePolicyAsync(clientId, policy.RoleMode, policy.OpenToEveryone, Input.AllowMachine && Input.CallsAllApps, policy.SendsGroups, HttpContext.RequestAborted);
             var known = OtherApps.Select(a => a.ClientId).Append(ClientRules.SelfId).ToHashSet(StringComparer.Ordinal);
             await _permissions.SetCallTargetsAsync(clientId, Input.AllowMachine ? Input.CallTargets.Where(known.Contains) : [], HttpContext.RequestAborted);
         }

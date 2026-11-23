@@ -298,6 +298,9 @@ namespace MatIdentity.Core.Data.Migrations
                     b.Property<int>("RoleMode")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("SendsGroups")
+                        .HasColumnType("INTEGER");
+
                     b.Property<DateTime>("UpdateDate")
                         .HasColumnType("TEXT");
 

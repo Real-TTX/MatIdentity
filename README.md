@@ -52,6 +52,7 @@ registers every app it installs here and gives it its sign-in.
 - **Who may sign in** to an app: a new app is open to nobody but the administrators until people or groups are given to it (or it is opened to everyone)
 - **Who decides the roles**, per app: *Admin* (MatIdentity gives each person or group a role of the app, the token carries it) or *Managed by the app* (no role in the token, the app decides)
 - The roles of an app come from its MatApiDefinition (`roles`) or are written down; the rules are asked at every sign-in and every renewal
+- **Groups to the app**, per app and off by default: the tokens carry the names of the person's groups (claim `groups`), so the app can map them to its own groups
 - **Which apps an app may call** (machine tokens): all, or the ones chosen
 
 **Apps**
@@ -119,7 +120,9 @@ An app with a sign-out address hears when a person signs out here (back-channel 
 ### Who may sign in, and with which role
 
 Per app: whether MatIdentity gives the roles (*Admin*) or the app keeps its own (*Managed by the app*), whether everyone may sign in, and which people
-and groups may – each with a role of the app. The roles come from the app's own description (`/api`) with one click.
+and groups may – each with a role of the app. The roles come from the app's own description (`/api`) with one click. *Send the person's groups to the app*
+(off by default) puts the names of all the person's groups into the tokens as the claim `groups` (with the scope `roles`, also when the app manages the roles), for an
+app that maps them to its own groups; through the API it is `sendsGroups`.
 
 ![The access of MatSplit: rules, people and groups with their roles](docs/images/app-access.png)
 
@@ -305,7 +308,7 @@ MatIdentity speaks the platform contract of the Mat apps (MatDesign [docs/PLATFO
 | `PUT /api/bindings/identity.oidc/{app}` | Bind an app: its OpenID Connect client (below), answered as its four `MATIDENTITY_*` variables. Key only |
 | `DELETE /api/bindings/identity.oidc/{app}?managedBy=` | Remove the client, only with its mark (none given: any mark; never an app without one). Key only |
 | `GET /api/connections` | What MatIdentity offers and uses, as the Connections page shows it (secrets as `{"isSet": …}`) |
-| `/api/v1/clients` | The apps (create, change, remove what the caller created): Mattiverse registers itself here; `backchannelLogoutUri`, `callTargets`, `permissions` and `quotas` are optional; each answer names the role mode, roles, permissions and quotas |
+| `/api/v1/clients` | The apps (create, change, remove what the caller created): Mattiverse registers itself here; `backchannelLogoutUri`, `callTargets`, `permissions`, `quotas` and `sendsGroups` are optional; each answer names the role mode, roles, permissions, quotas and `sendsGroups` |
 | `POST /api/v1/people/{subject}/actions/{action}` | `invite`, `resetPassword`, `signOut`, `unlock`, `resetSecondStep`: what SCIM has no word for |
 | `/scim/v2/Users`, `/scim/v2/Groups` | People and groups as SCIM 2.0, with what they are given in the apps (the extension `urn:mat:scim:schemas:extension:access:1.0`). With the key everything; with the key of a binding of `people.scim` the people of one app, read only. A company's directory (Entra ID, Okta, Google) can provision people with it |
 

@@ -79,6 +79,7 @@ public sealed class ConfigurationExport
                 RoleMode = policy.RoleMode == RoleMode.App ? "app" : "matidentity",
                 policy.OpenToEveryone,
                 policy.CallsAllApps,
+                policy.SendsGroups,
                 CallTargets = await _permissions.CallTargetsAsync(client.ClientId, ct),
                 Roles = await _permissions.RolesAsync(client.ClientId, ct),
                 Grants = grants,

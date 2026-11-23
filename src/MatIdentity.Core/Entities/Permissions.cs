@@ -50,6 +50,9 @@ public class AppPolicy : AuditableEntity
 
     /// <summary>The app may get a token for every app, also for those added later (Mattiverse). Else only for the apps in <see cref="AppCallGrant"/>.</summary>
     public bool CallsAllApps { get; set; }
+
+    /// <summary>The tokens of a person carry the names of their groups (claim <c>groups</c>, with the scope <c>roles</c>), whoever decides the roles.</summary>
+    public bool SendsGroups { get; set; }
 }
 
 /// <summary>A role of an app, as the app announces it in its MatApiDefinition or as an administrator writes it down. The order matters: the first is the most powerful.</summary>

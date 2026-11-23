@@ -97,6 +97,9 @@ public sealed record ClientUpsert
 
     public bool? CallsAllApps { get; init; }
 
+    /// <summary>The tokens of a person carry the names of their groups (claim <c>groups</c>); null keeps the setting.</summary>
+    public bool? SendsGroups { get; init; }
+
     /// <summary>The apps it may call by name (also MatIdentity's own API, which "every app" leaves out).</summary>
     public IReadOnlyList<string>? CallTargets { get; init; }
 }

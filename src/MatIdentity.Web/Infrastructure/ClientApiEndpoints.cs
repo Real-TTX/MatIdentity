@@ -80,6 +80,7 @@ public static class ClientApiEndpoints
                 Quotas = body.Quotas?.Select(q => new QuotaInfo(q.Key ?? string.Empty, q.Label ?? q.Key ?? string.Empty, q.Unit ?? string.Empty, q.Period, q.Min, q.Max, q.Hint)).ToList(),
                 OpenToEveryone = body.OpenToEveryone,
                 CallsAllApps = body.CallsAllApps,
+                SendsGroups = body.SendsGroups,
                 CallTargets = body.CallTargets,
             };
 
@@ -110,6 +111,7 @@ public static class ClientApiEndpoints
                 quotas = await permissions.QuotasAsync(clientId, ct),
                 saved.OpenToEveryone,
                 saved.CallsAllApps,
+                saved.SendsGroups,
             }, options);
         });
 
@@ -145,6 +147,7 @@ public static class ClientApiEndpoints
         var policy = await permissions.PolicyAsync(client.ClientId, ct);
         node["roleMode"] = policy.RoleMode == RoleMode.App ? "app" : "matidentity";
         node["openToEveryone"] = policy.OpenToEveryone;
+        node["sendsGroups"] = policy.SendsGroups;
         node["roles"] = JsonSerializer.SerializeToNode(await permissions.RolesAsync(client.ClientId, ct), MatApiDefinition.Json);
         node["permissions"] = JsonSerializer.SerializeToNode(await permissions.PermissionsAsync(client.ClientId, ct), MatApiDefinition.Json);
         node["quotas"] = JsonSerializer.SerializeToNode(await permissions.QuotasAsync(client.ClientId, ct), MatApiDefinition.Json);
@@ -248,7 +251,8 @@ public static class ClientApiEndpoints
         IReadOnlyList<string>? CallTargets = null,
         string? BackchannelLogoutUri = null,
         IReadOnlyList<PermissionBody>? Permissions = null,
-        IReadOnlyList<QuotaBody>? Quotas = null);
+        IReadOnlyList<QuotaBody>? Quotas = null,
+        bool? SendsGroups = null);
 
     public sealed record RoleBody(string? Key, string? Label);
 

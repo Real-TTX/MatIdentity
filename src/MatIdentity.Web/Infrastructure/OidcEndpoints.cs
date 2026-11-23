@@ -30,6 +30,9 @@ public static class OidcEndpoints
     /// <summary>The quotas MatIdentity set for the person in the app: a JSON object, null = no limit.</summary>
     public const string QuotasClaim = "mat_quotas";
 
+    /// <summary>The names of the person's groups at MatIdentity, only for an app whose rules send them (<see cref="AppPolicy.SendsGroups"/>).</summary>
+    public const string GroupsClaim = "groups";
+
     public static void MapOidcEndpoints(this WebApplication app)
     {
         app.MapMethods("/connect/authorize", [HttpMethods.Get, HttpMethods.Post], AuthorizeAsync).AllowAnonymous().DisableAntiforgery();
@@ -186,6 +189,12 @@ public static class OidcEndpoints
                     claims[QuotasClaim] = System.Text.Json.JsonDocument.Parse(quotas).RootElement.Clone();
                 }
             }
+
+            // The groups come whoever decides the roles (only for an app whose rules send them), always as a list.
+            if (result.Principal.GetClaims(GroupsClaim) is { Length: > 0 } groups)
+            {
+                claims[GroupsClaim] = groups.ToArray();
+            }
         }
 
         return Results.Ok(claims);
@@ -227,7 +236,8 @@ public static class OidcEndpoints
 
     /// <summary>
     /// The claims of a person, by the scopes the app asked for (<c>sub</c> always), with what the rules of the app give them there: the role, the permissions
-    /// (<c>entitlements</c>) and the quotas (<c>mat_quotas</c>); none of the three when the app decides the roles itself.
+    /// (<c>entitlements</c>) and the quotas (<c>mat_quotas</c>); none of the three when the app decides the roles itself. The names of the person's groups
+    /// (<c>groups</c>) whoever decides the roles, when the rules of the app send them.
     /// </summary>
     internal static ClaimsIdentity BuildIdentity(User user, ImmutableArray<string> scopes, AccessDecision decision)
     {
@@ -255,6 +265,11 @@ public static class OidcEndpoints
                 var quotas = System.Text.Json.JsonSerializer.Serialize(decision.Quotas.OrderBy(q => q.Key, StringComparer.Ordinal).ToDictionary(q => q.Key, q => q.Value));
                 identity.AddClaim(new Claim(QuotasClaim, quotas, Microsoft.IdentityModel.JsonWebTokens.JsonClaimValueTypes.Json));
             }
+        }
+
+        if (decision.Groups.Count > 0)
+        {
+            identity.SetClaims(GroupsClaim, [.. decision.Groups]);
         }
 
         identity.SetScopes(scopes);
@@ -285,7 +300,7 @@ public static class OidcEndpoints
                 yield return OpenIddictConstants.Destinations.IdentityToken;
                 yield break;
 
-            case Claims.Role or EntitlementsClaim or QuotasClaim when principal.HasScope(Scopes.Roles):
+            case Claims.Role or EntitlementsClaim or QuotasClaim or GroupsClaim when principal.HasScope(Scopes.Roles):
                 yield return OpenIddictConstants.Destinations.AccessToken;
                 yield return OpenIddictConstants.Destinations.IdentityToken;
                 yield break;
