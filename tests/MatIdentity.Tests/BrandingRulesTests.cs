@@ -125,6 +125,14 @@ public sealed class BrandingRulesTests
     public void The_brand_of_a_sign_in_is_the_client_of_its_local_authorize_request(string? returnUrl, string? clientId)
         => Assert.Equal(clientId, SignInBranding.AuthorizeClientId(returnUrl));
 
+    [Theory]
+    [InlineData("/connect/logout?client_id=matos&post_logout_redirect_uri=x", "matos")]
+    [InlineData("/connect/authorize?client_id=matos", "matos")]
+    [InlineData("/connect/logout?post_logout_redirect_uri=x", null)]
+    [InlineData("https://evil.example/connect/logout?client_id=matos", null)]
+    public void The_brand_of_a_sign_out_is_the_client_of_its_local_logout_request(string? returnUrl, string? clientId)
+        => Assert.Equal(clientId, SignInBranding.AppRequestClientId(returnUrl));
+
     [Fact]
     public void The_stylesheet_of_a_brand_sets_its_accent_and_its_picture()
     {

@@ -55,8 +55,9 @@ public sealed class AccountMailService
         return user;
     }
 
-    /// <summary>Sends the invitation of a person (the mail goes out now, so the administrator sees an error). Null when it went out, else why not.</summary>
-    public async Task<string?> InviteAsync(User user, string linkBase, string? invitedBy, CancellationToken ct = default)
+    /// <summary>Sends the invitation of a person (the mail goes out now, so the administrator sees an error). Null when it went out, else why not. A broker that
+    /// manages a branded app (MatOS) names its brand: the mail speaks of that app and its link opens the page in its look.</summary>
+    public async Task<string?> InviteAsync(User user, string linkBase, string? invitedBy, BrandInfo? brand = null, CancellationToken ct = default)
     {
         if (string.IsNullOrEmpty(user.Email))
         {
@@ -64,7 +65,7 @@ public sealed class AccountMailService
         }
 
         var key = await _tokens.IssueAsync(user.Id, AccountTokenPurpose.Invitation, user.Email, ct);
-        var mail = MailTemplates.Invitation(user.Email, user.DisplayName, await InstanceAsync(null, ct), Link(linkBase, "Reset", key), AccountTokenService.InvitationLifetime, invitedBy);
+        var mail = MailTemplates.Invitation(user.Email, user.DisplayName, await InstanceAsync(brand, ct), Link(linkBase, "Reset", key, brand), AccountTokenService.InvitationLifetime, invitedBy);
         var error = await _mail.SendAsync(mail, ct);
         if (error is not null)
         {

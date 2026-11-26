@@ -1,6 +1,6 @@
 @inject Toolkit Toolkit
 @{
-    // The pages of a sign-in (Login, Forgot, Reset, TwoFactor, Register, Verify, NoAccess, AccessDenied): _Bare, unless the sign-in belongs to an app with a brand
+    // The pages of a sign-in (Login, Forgot, Reset, TwoFactor, Register, Verify, NoAccess, AccessDenied, ChangePassword, Logout) and the error pages (StatusCode, Error): _Bare, unless the sign-in belongs to an app with a brand
     // (SignInBranding, docs/ARCHITECTURE.md "Branded sign-in"). Then the page is the app's: its name in the title, its icon, its accent and background
     // (theme.css of the brand), and none of MatIdentity's own name, logo, manifest or colour.
     var brand = await SignInBranding.ResolveAsync(Context);

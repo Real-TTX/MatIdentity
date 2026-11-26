@@ -1,15 +1,19 @@
 using MatIdentity.Core.Clients;
+using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.WebUtilities;
 
 namespace MatIdentity.Web.Infrastructure;
 
 /// <summary>
-/// The brand of the sign-in a request belongs to (docs/ARCHITECTURE.md "Branded sign-in"): the pages Login, Forgot, Reset, TwoFactor, Register, Verify, NoAccess and
-/// AccessDenied look like the app whose sign-in it is (its name, logo, accent, background) and, when the app hides MatIdentity, show nothing of it.
+/// The brand of the sign-in a request belongs to (docs/ARCHITECTURE.md "Branded sign-in"): the pages Login, Forgot, Reset, TwoFactor, Register, Verify, NoAccess,
+/// AccessDenied, ChangePassword, the sign-out question (Logout) and the error pages (StatusCode, Error) look like the app whose sign-in it is (its name, logo,
+/// accent, background) and, when the app hides MatIdentity, show nothing of it.
 /// <para>
-/// Where the brand comes from, first match wins: <c>?brand=&lt;clientId&gt;</c> (the links of the mails), <c>?app=</c> of NoAccess, the authorize request in the
-/// <c>returnUrl</c> (query or form; its <c>client_id</c>, and an app without a brand ends the brand), else the cookie <c>mid.brand</c> (30 minutes), which carries
-/// it through the flow (Forgot, the mail, Reset, back to the sign-in). A brand is looked up only for the id of a registered app.
+/// Where the brand comes from, first match wins: the request of an app in the <c>returnUrl</c> (query or form; the <c>client_id</c> of a local
+/// <c>/connect/authorize</c> or <c>/connect/logout</c>, and an app without a brand ends the brand), the OpenID Connect request being answered (an error page of
+/// <c>/connect/authorize</c>), then <c>?brand=&lt;clientId&gt;</c> (the links of the mails) and <c>?app=</c> of NoAccess, else the cookie <c>mid.brand</c>
+/// (30 minutes), which carries it through the flow (Forgot, the mail, Reset, back to the sign-in). The request of the app always wins over <c>?brand</c>: a page
+/// never shows one app's brand while it signs the person in to another. A brand is looked up only for the id of a registered app.
 /// </para>
 /// </summary>
 public static class SignInBranding
@@ -22,7 +26,11 @@ public static class SignInBranding
 
     /// <summary>The pages of a sign-in that take a brand.</summary>
     public static readonly IReadOnlyList<string> Pages =
-        ["/Account/Login", "/Account/Forgot", "/Account/Reset", "/Account/TwoFactor", "/Account/Register", "/Account/Verify", "/Account/NoAccess", "/Account/AccessDenied"];
+        ["/Account/Login", "/Account/Forgot", "/Account/Reset", "/Account/TwoFactor", "/Account/Register", "/Account/Verify", "/Account/NoAccess", "/Account/AccessDenied",
+         "/Account/ChangePassword", "/Account/Logout", "/Error"];
+
+    /// <summary>The error pages of a status (<c>/StatusCode/429</c>, ...): they take the brand too.</summary>
+    public const string StatusCodePrefix = "/StatusCode";
 
     private static readonly object ItemKey = new();
 
@@ -87,7 +95,7 @@ public static class SignInBranding
     public static IApplicationBuilder UseSignInBranding(this IApplicationBuilder app)
         => app.Use(async (http, next) =>
         {
-            if (Pages.Any(p => http.Request.Path.Equals(p, StringComparison.OrdinalIgnoreCase)))
+            if (IsBrandedPage(http.Request.Path))
             {
                 await ResolveAsync(http);
             }
@@ -95,10 +103,37 @@ public static class SignInBranding
             await next(http);
         });
 
-    /// <summary>The client id the request names, and whether it names one at all (an authorize request of an app without a brand names "none").</summary>
+    /// <summary>Whether a path is one of the pages that take a brand (the pages of a sign-in, and the error pages of a status).</summary>
+    public static bool IsBrandedPage(PathString path)
+        => Pages.Any(p => path.Equals(p, StringComparison.OrdinalIgnoreCase)) || path.StartsWithSegments(StatusCodePrefix, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>An error page, re-executed for another request: its body is not read again (the cookie carries the brand there).</summary>
+    private static bool IsErrorPage(PathString path)
+        => path.StartsWithSegments(StatusCodePrefix, StringComparison.OrdinalIgnoreCase) || path.Equals("/Error", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>The client id the request names, and whether it names one at all (a request of an app without a brand names "none").</summary>
     private static async Task<(string? ClientId, bool Named)> NamedAsync(HttpContext http)
     {
         var request = http.Request;
+
+        // The request of an app the page continues with decides: a ?brand beside it would dress up the sign-in of one app as another's.
+        var returnUrl = request.Query["returnUrl"].ToString();
+        if (returnUrl.Length == 0 && HttpMethods.IsPost(request.Method) && request.HasFormContentType && !IsErrorPage(request.Path))
+        {
+            returnUrl = (await request.ReadFormAsync(http.RequestAborted))["ReturnUrl"].ToString();
+        }
+
+        if (AppRequestClientId(returnUrl) is { } requested)
+        {
+            return (requested, true);
+        }
+
+        // An error page of an endpoint of OpenID Connect (a request OpenIddict refused, shown by /StatusCode): the app that sent it.
+        if (http.GetOpenIddictServerRequest()?.ClientId is { Length: > 0 } answering)
+        {
+            return (answering, true);
+        }
+
         if (request.Query[QueryKey].ToString() is { Length: > 0 } brand)
         {
             return (brand, true);
@@ -109,17 +144,17 @@ public static class SignInBranding
             return (app, true);
         }
 
-        var returnUrl = request.Query["returnUrl"].ToString();
-        if (returnUrl.Length == 0 && HttpMethods.IsPost(request.Method) && request.HasFormContentType)
-        {
-            returnUrl = (await request.ReadFormAsync(http.RequestAborted))["ReturnUrl"].ToString();
-        }
-
-        return AuthorizeClientId(returnUrl) is { } clientId ? (clientId, true) : (null, false);
+        return (null, false);
     }
 
     /// <summary>The <c>client_id</c> of a local address of the authorize endpoint (<c>/connect/authorize?client_id=…</c>), else null.</summary>
-    public static string? AuthorizeClientId(string? returnUrl)
+    public static string? AuthorizeClientId(string? returnUrl) => EndpointClientId(returnUrl, "/connect/authorize");
+
+    /// <summary>The <c>client_id</c> of a local address of the authorize or the end-session endpoint (<c>/connect/logout?client_id=…</c>), else null.</summary>
+    public static string? AppRequestClientId(string? returnUrl)
+        => EndpointClientId(returnUrl, "/connect/authorize") ?? EndpointClientId(returnUrl, "/connect/logout");
+
+    private static string? EndpointClientId(string? returnUrl, string endpoint)
     {
         if (!LocalUrl.IsLocal(returnUrl))
         {
@@ -128,13 +163,23 @@ public static class SignInBranding
 
         var question = returnUrl!.IndexOf('?', StringComparison.Ordinal);
         var path = question < 0 ? returnUrl : returnUrl[..question];
-        if (question < 0 || !path.EndsWith("/connect/authorize", StringComparison.OrdinalIgnoreCase))
+        if (question < 0 || !path.EndsWith(endpoint, StringComparison.OrdinalIgnoreCase))
         {
             return null;
         }
 
         return QueryHelpers.ParseQuery(returnUrl[question..]).TryGetValue("client_id", out var id) && id.ToString() is { Length: > 0 } value ? value : null;
     }
+
+    /// <summary>
+    /// The brand a caller of the API names for the mails it triggers (header <see cref="MailBrandHeader"/>: the client id of a branded app, sent by the broker that
+    /// manages it, e.g. MatOS for the invitation and the new password of its people), or null. An id that is not a branded app is ignored: the mail is MatIdentity's.
+    /// </summary>
+    public static async Task<BrandInfo?> MailBrandAsync(HttpContext http)
+        => http.Request.Headers[MailBrandHeader].ToString().Trim() is { Length: > 0 } clientId ? (await LookUpAsync(http, clientId))?.Info : null;
+
+    /// <summary>The header of <see cref="MailBrandAsync"/>.</summary>
+    public const string MailBrandHeader = "X-Mat-Brand";
 
     /// <summary>The brand of a registered app, or null (an id that is not an app's never reaches the database of brands).</summary>
     private static async Task<SignInBrand?> LookUpAsync(HttpContext http, string? clientId)

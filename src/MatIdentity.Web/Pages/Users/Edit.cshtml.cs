@@ -222,7 +222,7 @@ public class EditModel : PageModel
     private async Task<bool> InviteAsync(User user)
     {
         var linkBase = await Support.Authority.GetAsync(HttpContext, _config, _configuration);
-        var error = await _accounts.InviteAsync(user, linkBase, User.GetDisplayName(), HttpContext.RequestAborted);
+        var error = await _accounts.InviteAsync(user, linkBase, User.GetDisplayName(), ct: HttpContext.RequestAborted);
         if (error is null)
         {
             await _activity.WriteAsync(ActivityKind.InvitationSent, username: User.GetUsername(), ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString(),

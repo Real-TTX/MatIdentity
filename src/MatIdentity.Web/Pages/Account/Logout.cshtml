@@ -1,19 +1,23 @@
 @page
 @model MatIdentity.Web.Pages.Account.LogoutModel
 @{
-    Layout = "_Bare";
+    Layout = "_SignIn";
     ViewData["Title"] = "Sign out";
+    // The sign-out of an app with a brand (its request in the returnUrl, else the cookie of its sign-in): its look; when it hides MatIdentity, Cancel goes back to it.
+    var brand = await SignInBranding.ResolveAsync(HttpContext);
+    var hidden = brand is { HideIdentity: true };
+    var cancel = hidden ? brand!.HomeUrl ?? "/" : "/";
 }
 
 <div class="mat-auth__card">
     <div class="mat-auth__brand">
-        @Ui.Logo("lg")
+        <partial name="_AuthLogo" />
         <h1>Sign out?</h1>
-        <p class="mat-muted">You are signed in as @User.GetDisplayName(). Signing out ends your sign-in here; the apps ask for it again.</p>
+        <p class="mat-muted">You are signed in as @User.GetDisplayName(). @(hidden ? $"Signing out ends your sign-in at {brand!.Name}." : "Signing out ends your sign-in here; the apps ask for it again.")</p>
     </div>
     <form method="post" class="mat-btn-row mat-btn-row--plain">
         <input type="hidden" asp-for="ReturnUrl" />
         <button type="submit" class="mat-btn mat-btn--primary mat-btn--block"><icon name="logout" /><span>Sign out</span></button>
     </form>
-    <a class="mat-btn mat-btn--ghost mat-btn--block" href="/">Cancel</a>
+    <a class="mat-btn mat-btn--ghost mat-btn--block" href="@cancel">Cancel</a>
 </div>

@@ -1,13 +1,22 @@
 @page "/StatusCode/{code:int?}"
 @model MatIdentity.Web.Pages.StatusCodeModel
 @{
-    Layout = "_Bare";
+    Layout = "_SignIn";
+    // During the sign-in of an app with a brand (SignInBranding): its look; when it hides MatIdentity, no word of it and the way back leads to the app.
+    var brand = await SignInBranding.ResolveAsync(HttpContext);
+    var hidden = brand is { HideIdentity: true };
+    if (hidden && Model.ProtocolError is not null)
+    {
+        Model.HideIdentity();
+    }
+
     ViewData["Title"] = Model.Title;
+    var home = hidden ? brand!.HomeUrl : "/";
 }
 
 <div class="mat-auth__card">
     <div class="mat-auth__brand">
-        @Ui.Logo("lg")
+        <partial name="_AuthLogo" />
         <h1>@Model.Title</h1>
         <p class="mat-muted">@Model.Message</p>
         @if (Model.ProtocolError is not null)
@@ -15,5 +24,8 @@
             <p class="mat-mono mat-muted">@Model.ProtocolError</p>
         }
     </div>
-    <a href="/" class="mat-btn mat-btn--primary mat-btn--block"><icon name="home" /><span>Back to Home</span></a>
+    @if (home is not null)
+    {
+        <a href="@home" class="mat-btn mat-btn--primary mat-btn--block"><icon name="home" /><span>@(hidden ? $"Back to {brand!.Name}" : "Back to Home")</span></a>
+    }
 </div>

@@ -39,4 +39,11 @@ public class StatusCodeModel : PageModel
             ProtocolError = string.IsNullOrEmpty(response.ErrorDescription) ? error : $"{error}: {response.ErrorDescription}";
         }
     }
+
+    /// <summary>The words for the sign-in of an app that hides MatIdentity (SignInBranding): the same error, without naming MatIdentity.</summary>
+    public void HideIdentity()
+    {
+        Title = "The app sent a request that cannot be accepted";
+        Message = "Ask the administrator to check the settings of the app (its id and its addresses).";
+    }
 }

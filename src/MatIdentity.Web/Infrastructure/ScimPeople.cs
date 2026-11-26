@@ -56,7 +56,7 @@ public sealed class ScimPeople(
         if (invite)
         {
             var linkBase = await Support.Authority.GetAsync(context, config, configuration);
-            if (await accounts.InviteAsync(created, linkBase, actor, ct) is null)
+            if (await accounts.InviteAsync(created, linkBase, actor, await SignInBranding.MailBrandAsync(context), ct) is null)
             {
                 await activity.WriteAsync(ActivityKind.InvitationSent, username: actor, ipAddress: Ip(), detail: created.Username, ct: ct);
             }

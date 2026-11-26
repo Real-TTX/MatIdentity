@@ -1,13 +1,17 @@
 @page
 @model ErrorModel
 @{
-    Layout = "_Bare";
+    Layout = "_SignIn";
     ViewData["Title"] = "Error";
+    // During the sign-in of an app with a brand (SignInBranding): its look; when it hides MatIdentity, the way back leads to the app.
+    var brand = await SignInBranding.ResolveAsync(HttpContext);
+    var hidden = brand is { HideIdentity: true };
+    var home = hidden ? brand!.HomeUrl : "/";
 }
 
 <div class="mat-auth__card">
     <div class="mat-auth__brand">
-        @Ui.Logo("lg")
+        <partial name="_AuthLogo" />
         <h1>Something went wrong</h1>
         <p class="mat-muted">The request could not be processed.</p>
         @if (Model.ShowRequestId)
@@ -15,5 +19,8 @@
             <p class="mat-mono mat-muted">Request id: @Model.RequestId</p>
         }
     </div>
-    <a href="/" class="mat-btn mat-btn--primary mat-btn--block"><icon name="home" /><span>Back to Home</span></a>
+    @if (home is not null)
+    {
+        <a href="@home" class="mat-btn mat-btn--primary mat-btn--block"><icon name="home" /><span>@(hidden ? $"Back to {brand!.Name}" : "Back to Home")</span></a>
+    }
 </div>

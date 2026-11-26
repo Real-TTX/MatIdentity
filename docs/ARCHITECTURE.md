@@ -159,18 +159,26 @@ every other app in without a password: single sign-on stays.
   logo) and `/theme.css` (the accent as `--mat-app-accent` of `[data-app="brand"]`, the background as `--mi-brand-image`; without one `matidentity.css` lays a calm gradient from
   the accent). Each with an ETag (304), a year of caching with the current `?v=`, an hour without, `X-Content-Type-Options: nosniff`; the pictures with
   `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox`: an SVG is only ever shown through `<img>`, and opened by itself it runs nothing.
-- **Which pages.** Login, Forgot, Reset, TwoFactor, Register, Verify, NoAccess and AccessDenied use the layout `_SignIn`: `_Bare` as before, unless `SignInBranding` finds a
+- **Which pages.** Login, Forgot, Reset, TwoFactor, Register, Verify, NoAccess, AccessDenied, ChangePassword (the forced change of a password during a branded
+  sign-in), the sign-out question (Logout) and the error pages (`StatusCode/*`, `Error`) use the layout `_SignIn`: `_Bare` as before, unless `SignInBranding` finds a
   brand; then the whole document is the app's (title "Sign in · MatOS", its icon, no manifest, `data-app="brand"`, its theme.css) and `_AuthLogo` shows its logo. With
   `hideIdentity` no word, logo, footer, version or link of MatIdentity is on those pages (a link home goes to the app's `homeUrl`, or is left out); without it the sign-in says
   "With your MatIdentity account".
-- **Where the brand comes from** (`Infrastructure/SignInBranding`, first match wins): `?brand=<clientId>` (the links of the mails), `?app=` of NoAccess, the `client_id` of the
-  authorize request in the `returnUrl` (query or form; an app without a brand ends the brand), else the cookie `mid.brand` (the client id, 30 minutes, HttpOnly, SameSite=Lax),
-  which the pages set whenever a request names a brand. A brand is looked up only for the id of a registered app. A middleware works it out at the start of those pages, so
+- **Where the brand comes from** (`Infrastructure/SignInBranding`, first match wins): the `client_id` of the app's request in the `returnUrl` (a local
+  `/connect/authorize` or `/connect/logout`; query or form; an app without a brand ends the brand), the OpenID Connect request an error page answers, `?brand=<clientId>`
+  (the links of the mails), `?app=` of NoAccess, else the cookie `mid.brand` (the client id, 30 minutes, HttpOnly, SameSite=Lax),
+  which the pages set whenever a request names a brand. A brand is looked up only for the id of a registered app. The app's request always wins over `?brand`: a page never
+  shows one app's brand while it signs the person in to another. A middleware works it out at the start of those pages, so
   the cookie is set before the answer begins.
 - **Through the flow.** Forgot -> the mail -> Reset -> the sign-in stays branded: the links of the reset and verification mails carry `&brand=<clientId>`, and with
   `hideIdentity` the mails speak of the app ("MatOS: set a new password"). A sign-in that has no request of an app to go back to (after a new password) ends at the app's
   `homeUrl` instead of MatIdentity's home page (`SignInBranding.ContinueTo`, also after the second step and a passkey); the app then starts its sign-in and finds the session.
-- **Not branded:** the account pages, the forced password change, Setup, the errors (`StatusCode`), invitations sent by an administrator.
+- **Mails a broker triggers.** The invitation and the new password a broker asks for (`POST /api/v1/people/{subject}/actions/invite|resetPassword`, SCIM
+  `POST /scim/v2/Users` without a password) take the brand the header `X-Mat-Brand: <clientId>` names (a registered app with a brand, else ignored): the mail speaks of
+  the app when it hides MatIdentity and its link carries `&brand=`. MatOS sends its own client id.
+- **The forced password change.** `PasswordChangeGuardMiddleware` sends a person who must change their password to `/Account/ChangePassword`: with a brand a step of the
+  sign-in in its look, without one it hands over to the password tab of the account, as before.
+- **Not branded:** the account pages, Setup, invitations sent by an administrator in the UI.
 
 ## Sign-out reaches the apps
 

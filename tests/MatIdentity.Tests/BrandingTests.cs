@@ -263,6 +263,132 @@ public sealed partial class BrandingTests
         Assert.Equal(Home, await IdentityFactory.SignInAsync(other, back, "brandforget", "Brand-Pass-2024"));
     }
 
+    [Fact]
+    public async Task The_request_of_the_app_decides_the_brand_not_a_brand_named_beside_it()
+    {
+        await BrandAsync("matos-mask");
+        await RegisterAsync("plain-target", branding: null);
+        var browser = _site.Browser();
+        await browser.GetStringAsync(await LoginUrlAsync(browser, "matos-mask"));
+
+        // A link that names MatOS's brand but signs in to another app: the page is that app's sign-in (MatIdentity's), and the brand of the flow ends.
+        var login = await LoginUrlAsync(browser, "plain-target");
+        var response = await browser.GetAsync(login + "&brand=matos-mask");
+        var html = await response.Content.ReadAsStringAsync();
+        AssertMatIdentity(html);
+        Assert.Contains(response.Headers.GetValues("Set-Cookie"), c => c.StartsWith("mid.brand=;", StringComparison.Ordinal));
+        AssertMatIdentity(await browser.GetStringAsync("/Account/Forgot"));
+    }
+
+    [Fact]
+    public async Task The_sign_out_question_of_a_branded_app_is_in_its_look()
+    {
+        await BrandAsync("matos-out");
+        await CreatePersonAsync("brandout", mustChange: false);
+        var browser = _site.Browser();
+        await IdentityFactory.SignInAsync(browser, "/Account/Login", "brandout", "Person-Pass-1");
+
+        // A sign-out of the app without the ID token of the person: the question comes, in the look of the app, and Cancel goes back to it.
+        var logout = await browser.GetAsync($"/connect/logout?client_id=matos-out&post_logout_redirect_uri={Uri.EscapeDataString(Home)}");
+        Assert.Equal(HttpStatusCode.Redirect, logout.StatusCode);
+        var question = logout.Headers.Location!.OriginalString;
+        Assert.StartsWith("/Account/Logout?returnUrl=", question);
+        var html = await browser.GetStringAsync(question);
+        Assert.Contains("Sign out?", html);
+        Assert.Contains("/branding/matos-out/logo", html);
+        Assert.Contains($"href=\"{Home}\"", html);
+        AssertNoIdentity(html);
+    }
+
+    [Fact]
+    public async Task An_error_during_a_branded_sign_in_stays_in_its_look()
+    {
+        await BrandAsync("matos-error");
+        var browser = _site.Browser();
+        await browser.GetStringAsync(await LoginUrlAsync(browser, "matos-error"));
+
+        var html = await browser.GetStringAsync("/StatusCode/429");
+        Assert.Contains("Too many attempts", html);
+        Assert.Contains("/branding/matos-error/logo", html);
+        Assert.Contains($"href=\"{Home}\"", html);
+        AssertNoIdentity(html);
+
+        // A request of the app that MatIdentity refuses names the app itself.
+        var refused = await _site.Browser().GetAsync($"/connect/authorize?client_id=matos-error&response_type=code&scope=openid&redirect_uri={Uri.EscapeDataString("https://elsewhere.example.test/cb")}");
+        var page = await refused.Content.ReadAsStringAsync();
+        Assert.Contains("/branding/matos-error/logo", page);
+        AssertNoIdentity(page);
+
+        AssertMatIdentity(await _site.Browser().GetStringAsync("/StatusCode/404"));
+    }
+
+    [Fact]
+    public async Task A_password_that_must_change_is_changed_in_the_look_of_the_sign_in()
+    {
+        await BrandAsync("matos-change");
+        await CreatePersonAsync("brandchange", mustChange: true);
+        var browser = _site.Browser();
+        var login = await LoginUrlAsync(browser, "matos-change");
+        var authorize = await IdentityFactory.SignInAsync(browser, login, "brandchange", "Person-Pass-1");
+        var guard = await browser.GetAsync(authorize);
+        Assert.Equal(HttpStatusCode.Redirect, guard.StatusCode);
+        var change = guard.Headers.Location!.OriginalString;
+        Assert.StartsWith("/Account/ChangePassword?returnUrl=", change);
+
+        var html = await browser.GetStringAsync(change);
+        Assert.Contains("Set your own password", html);
+        Assert.Contains("/branding/matos-change/logo", html);
+        AssertNoIdentity(html);
+
+        var saved = await IdentityFactory.PostFormAsync(browser, change, new()
+        {
+            ["Input.CurrentPassword"] = "Person-Pass-1",
+            ["Input.NewPassword"] = "Brand-Change-2024",
+            ["Input.ConfirmPassword"] = "Brand-Change-2024",
+            ["ReturnUrl"] = authorize,
+        });
+        Assert.Equal(HttpStatusCode.Redirect, saved.StatusCode);
+        Assert.Equal(authorize, saved.Headers.Location!.OriginalString);
+
+        // Without a brand the step is the password tab of the account, as before.
+        await CreatePersonAsync("plainchange", mustChange: true);
+        var plain = _site.Browser();
+        await IdentityFactory.SignInAsync(plain, "/Account/Login", "plainchange", "Person-Pass-1");
+        var step = await plain.GetAsync("/Account/ChangePassword?returnUrl=%2F");
+        Assert.Equal("/Account/Profile?tab=password&returnUrl=%2F", step.Headers.Location!.OriginalString);
+    }
+
+    [Fact]
+    public async Task A_broker_names_its_brand_for_the_mails_of_its_people()
+    {
+        await BrandAsync("matos-mail");
+        var subject = await CreatePersonAsync("brandmail", mustChange: false);
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/people/{subject}/actions/resetPassword");
+        request.Headers.Add("X-Mat-Brand", "matos-mail");
+        Assert.True((await _site.Api().SendAsync(request)).IsSuccessStatusCode);
+        var mail = await _site.Mails.WaitForAsync("brandmail@example.test", "set a new password");
+        Assert.StartsWith("MatOS:", mail.Subject);
+        Assert.DoesNotContain("MatIdentity", mail.Text);
+        Assert.Contains("&brand=matos-mail", mail.Text);
+
+        using var invite = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/people/{subject}/actions/invite");
+        invite.Headers.Add("X-Mat-Brand", "matos-mail");
+        Assert.True((await _site.Api().SendAsync(invite)).IsSuccessStatusCode);
+        var invitation = await _site.Mails.WaitForAsync("brandmail@example.test", "your account");
+        Assert.Equal("MatOS: your account", invitation.Subject);
+        Assert.DoesNotContain("MatIdentity", invitation.Text);
+        Assert.Contains("&brand=matos-mail", invitation.Text);
+    }
+
+    private async Task<string> CreatePersonAsync(string username, bool mustChange)
+    {
+        using var scope = _site.Services.CreateScope();
+        var user = await scope.ServiceProvider.GetRequiredService<UserService>()
+            .CreateAsync(username, "Brand Person", username + "@example.test", "Person-Pass-1", UserRole.User, mustChangePassword: mustChange);
+        return user.Subject;
+    }
+
     [GeneratedRegex(@"http://localhost/Account/Reset\?token=([A-Za-z0-9_-]+)&brand=[a-z0-9_-]+")]
     private static partial Regex LinkRegex();
 

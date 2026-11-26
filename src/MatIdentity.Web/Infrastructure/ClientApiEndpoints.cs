@@ -367,15 +367,17 @@ public static class ClientApiEndpoints
             : http.Items[ApiAccess.CallerKey] as string;
         var ip = http.Connection.RemoteIpAddress?.ToString();
         var linkBase = await Support.Authority.GetAsync(http, config, configuration);
+        // A broker that manages a branded app (MatOS) names it (header X-Mat-Brand): the mail and the page of its link are in the look of that app.
+        var brand = await SignInBranding.MailBrandAsync(http);
 
         (bool Ok, string Message)? result = action switch
         {
-            "invite" => await accounts.InviteAsync(user, linkBase, actor, ct) is { } error
+            "invite" => await accounts.InviteAsync(user, linkBase, actor, brand, ct) is { } error
                 ? (false, "The invitation was not sent. " + error)
                 : (true, $"The invitation is on its way to {user.Email}."),
             "resetPassword" => string.IsNullOrEmpty(user.Email)
                 ? (false, "The person has no e-mail address.")
-                : await accounts.RequestPasswordResetAsync(user.Username, linkBase, ct: ct) is not null
+                : await accounts.RequestPasswordResetAsync(user.Username, linkBase, brand, ct) is not null
                     ? (true, $"A link for a new password is on its way to {user.Email}.")
                     : (false, $"No link was sent: the account is disabled, or it got {AccountMailService.MaxResetsPerHour} links in the last hour."),
             "signOut" => (true, $"Signed out everywhere ({await sessions.InvalidateAllAsync(user.Id, ct: ct)} sessions, {await revoker.RevokeForSubjectAsync(user.Subject, ct)} app sign-ins)."),
