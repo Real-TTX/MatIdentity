@@ -283,6 +283,8 @@ app.UseAuthentication();
 // First run: redirect everything to /Setup until an administrator exists.
 app.UseMiddleware<SetupGuardMiddleware>();
 app.UseMiddleware<PasswordChangeGuardMiddleware>();
+// The pages of a sign-in look like the app it is for, when that app has a brand (docs/ARCHITECTURE.md "Branded sign-in").
+app.UseSignInBranding();
 app.UseAuthorization();
 app.MapRazorPages();
 
@@ -292,6 +294,7 @@ app.MapMatPlatform();
 app.MapClientApi();
 app.MapThemeApi();
 app.MapPasskeyEndpoints();
+app.MapBrandingEndpoints();
 
 // ---------------------------------------------------------------------------
 // Database migration + first-run seed

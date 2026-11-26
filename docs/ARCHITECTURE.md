@@ -142,6 +142,36 @@ address is unconfirmed again). "Forgot your password?" and self-registration are
 of a request (reset poisoning). A password set by link ends every other sign-in and counts as confirming the address. Self-registration (off by default)
 makes a disabled account that works after the confirmation; unconfirmed ones are removed after 7 days.
 
+## Branded sign-in
+
+A broker can give the sign-in of an app it manages a look of its own, so that a person signs in **to that app** and never sees MatIdentity (MatOS: "Sign in to MatOS",
+its logo, its accent; the apps it installs keep MatIdentity's own sign-in, "Sign in once, for all your apps"). The sign-in itself still happens here, so its session lets
+every other app in without a password: single sign-on stays.
+
+- **Where it is set.** `PUT /api/v1/clients/{id}` with `branding` (missing keeps it, `null` removes it):
+  `{ name, accent: "#rrggbb"?, hideIdentity, logo: { contentType: "image/svg+xml"|"image/png", data: Base64 }?, background: { contentType: "image/jpeg"|"image/png"|"image/webp", data: Base64 }? }`.
+  The name, accent and `hideIdentity` are set as a whole; a picture that is missing is kept, `null` removes it. Logo at most 256 KiB, background 2 MiB; the bytes must be of
+  the type they claim (`BrandingRules`); anything wrong is a 400 with `errors["branding.*"]` and nothing is saved. Only the one who manages the app brands it: the request's
+  `managedBy` must be the app's mark (none for an app an administrator made), else 409. `GET` answers `branding` without the pictures:
+  `{ name, accent, hideIdentity, hasLogo, hasBackground, logoContentType, backgroundContentType, logoUrl, backgroundUrl }` (absolute, with `?v=`), or null. Removing the app
+  removes its look. The table is `ClientBranding` (`Core/Clients/BrandingService`); the pictures live in it, never on disk.
+- **Served from here.** `/branding/{clientId}/logo`, `/background`, `/icon.svg` (the first letters of the name on the accent: the logo and the tab's icon of a brand without a
+  logo) and `/theme.css` (the accent as `--mat-app-accent` of `[data-app="brand"]`, the background as `--mi-brand-image`; without one `matidentity.css` lays a calm gradient from
+  the accent). Each with an ETag (304), a year of caching with the current `?v=`, an hour without, `X-Content-Type-Options: nosniff`; the pictures with
+  `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox`: an SVG is only ever shown through `<img>`, and opened by itself it runs nothing.
+- **Which pages.** Login, Forgot, Reset, TwoFactor, Register, Verify, NoAccess and AccessDenied use the layout `_SignIn`: `_Bare` as before, unless `SignInBranding` finds a
+  brand; then the whole document is the app's (title "Sign in · MatOS", its icon, no manifest, `data-app="brand"`, its theme.css) and `_AuthLogo` shows its logo. With
+  `hideIdentity` no word, logo, footer, version or link of MatIdentity is on those pages (a link home goes to the app's `homeUrl`, or is left out); without it the sign-in says
+  "With your MatIdentity account".
+- **Where the brand comes from** (`Infrastructure/SignInBranding`, first match wins): `?brand=<clientId>` (the links of the mails), `?app=` of NoAccess, the `client_id` of the
+  authorize request in the `returnUrl` (query or form; an app without a brand ends the brand), else the cookie `mid.brand` (the client id, 30 minutes, HttpOnly, SameSite=Lax),
+  which the pages set whenever a request names a brand. A brand is looked up only for the id of a registered app. A middleware works it out at the start of those pages, so
+  the cookie is set before the answer begins.
+- **Through the flow.** Forgot -> the mail -> Reset -> the sign-in stays branded: the links of the reset and verification mails carry `&brand=<clientId>`, and with
+  `hideIdentity` the mails speak of the app ("MatOS: set a new password"). A sign-in that has no request of an app to go back to (after a new password) ends at the app's
+  `homeUrl` instead of MatIdentity's home page (`SignInBranding.ContinueTo`, also after the second step and a passkey); the app then starts its sign-in and finds the session.
+- **Not branded:** the account pages, the forced password change, Setup, the errors (`StatusCode`), invitations sent by an administrator.
+
 ## Sign-out reaches the apps
 
 OpenID Connect Back-Channel Logout 1.0. The ID token carries `sid`, the public id of the session (`SessionIds.Of`: a hash of the session token, never the

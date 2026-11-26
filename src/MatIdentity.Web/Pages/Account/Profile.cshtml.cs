@@ -165,7 +165,7 @@ public class ProfileModel : PageModel
         }
 
         var linkBase = await Support.Authority.GetAsync(HttpContext, _config, _configuration);
-        StatusMessage = await _accounts.SendVerificationAsync(user, linkBase, HttpContext.RequestAborted)
+        StatusMessage = await _accounts.SendVerificationAsync(user, linkBase, ct: HttpContext.RequestAborted)
             ? $"A link is on its way to {user.Email}. It works for 48 hours."
             : "No mail could be sent.";
         return RedirectToPage();

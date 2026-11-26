@@ -1,15 +1,28 @@
 @page
 @model MatIdentity.Web.Pages.Account.LoginModel
 @{
-    Layout = "_Bare";
+    Layout = "_SignIn";
     ViewData["Title"] = "Sign in";
+    var brand = await SignInBranding.ResolveAsync(HttpContext);
 }
 
 <div class="mat-auth__card">
     <div class="mat-auth__brand">
-        @Ui.Logo("lg")
-        <h1>@Model.InstanceName</h1>
-        <p class="mat-muted">@(Model.ForApp ? "Sign in once, for all your apps." : Ui.App.Tagline)</p>
+        <partial name="_AuthLogo" />
+        @if (brand is null)
+        {
+            <h1>@Model.InstanceName</h1>
+            <p class="mat-muted">@(Model.ForApp ? "Sign in once, for all your apps." : Ui.App.Tagline)</p>
+        }
+        else
+        {
+            @* The sign-in of an app with a brand (MatOS): its name; MatIdentity only when the app does not hide it. *@
+            <h1>Sign in to @brand.Name</h1>
+            @if (!brand.HideIdentity)
+            {
+                <p class="mat-muted">With your @Model.InstanceName account, once for all your apps.</p>
+            }
+        }
     </div>
 
     @if (Model.SignedOut)

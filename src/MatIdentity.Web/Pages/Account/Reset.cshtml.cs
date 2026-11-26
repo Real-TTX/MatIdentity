@@ -92,6 +92,7 @@ public class ResetModel : PageModel
         await _revoker.RevokeForSubjectAsync(user.Subject, HttpContext.RequestAborted);
         await _activity.WriteAsync(ActivityKind.PasswordSetByLink, user, ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString(),
             detail: invitation ? "Invitation accepted" : "Password reset", ct: HttpContext.RequestAborted);
-        return RedirectToPage("/Account/Login", new { passwordSet = true });
+        // Back to the sign-in in the same look (the link of a branded sign-in carries ?brand=).
+        return RedirectToPage("/Account/Login", new { passwordSet = true, brand = SignInBranding.Current(HttpContext)?.ClientId });
     }
 }

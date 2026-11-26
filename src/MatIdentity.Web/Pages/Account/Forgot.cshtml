@@ -1,14 +1,14 @@
 @page
 @model MatIdentity.Web.Pages.Account.ForgotModel
 @{
-    Layout = "_Bare";
+    Layout = "_SignIn";
     ViewData["Title"] = "Forgot your password?";
     var back = "/Account/Login" + (string.IsNullOrEmpty(Model.ReturnUrl) ? string.Empty : "?returnUrl=" + Uri.EscapeDataString(Model.ReturnUrl));
 }
 
 <div class="mat-auth__card">
     <div class="mat-auth__brand">
-        @Ui.Logo("lg")
+        <partial name="_AuthLogo" />
         <h1>Forgot your password?</h1>
         <p class="mat-muted">We send a link to the e-mail address of your account. It works for 30 minutes.</p>
     </div>

@@ -37,6 +37,7 @@ public class MatIdentityDbContext : DbContext
     public DbSet<AppPermission> AppPermissions => Set<AppPermission>();
     public DbSet<AppQuota> AppQuotas => Set<AppQuota>();
     public DbSet<AccountToken> AccountTokens => Set<AccountToken>();
+    public DbSet<ClientBranding> ClientBrandings => Set<ClientBranding>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -211,6 +212,21 @@ public class MatIdentityDbContext : DbContext
             e.HasIndex(x => x.TokenHash).IsUnique();
             e.HasIndex(x => new { x.UserId, x.Purpose });
             e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasQueryFilter(x => x.UpdateState != UpdateState.Deleted);
+        });
+
+        modelBuilder.Entity<ClientBranding>(e =>
+        {
+            e.ToTable("ClientBranding");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.ClientId).HasMaxLength(100).IsRequired();
+            e.Property(x => x.Name).HasMaxLength(Clients.BrandingRules.MaxNameLength).IsRequired();
+            e.Property(x => x.Accent).HasMaxLength(7);
+            e.Property(x => x.LogoContentType).HasMaxLength(32);
+            e.Property(x => x.LogoHash).HasMaxLength(16);
+            e.Property(x => x.BackgroundContentType).HasMaxLength(32);
+            e.Property(x => x.BackgroundHash).HasMaxLength(16);
+            e.HasIndex(x => x.ClientId).IsUnique().HasFilter("\"UpdateState\" <> 0");
             e.HasQueryFilter(x => x.UpdateState != UpdateState.Deleted);
         });
 

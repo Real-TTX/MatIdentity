@@ -1,13 +1,13 @@
 @page
 @model MatIdentity.Web.Pages.Account.RegisterModel
 @{
-    Layout = "_Bare";
+    Layout = "_SignIn";
     ViewData["Title"] = "Create an account";
 }
 
 <div class="mat-auth__card">
     <div class="mat-auth__brand">
-        @Ui.Logo("lg")
+        <partial name="_AuthLogo" />
         <h1>Create an account</h1>
         <p class="mat-muted">One account for the apps here. It works once you confirm your e-mail address.</p>
     </div>

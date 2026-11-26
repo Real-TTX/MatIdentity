@@ -434,6 +434,75 @@ namespace MatIdentity.Core.Data.Migrations
                     b.ToTable("AppRole", (string)null);
                 });
 
+            modelBuilder.Entity("MatIdentity.Core.Entities.ClientBranding", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Accent")
+                        .HasMaxLength(7)
+                        .HasColumnType("TEXT");
+
+                    b.Property<byte[]>("Background")
+                        .HasColumnType("BLOB");
+
+                    b.Property<string>("BackgroundContentType")
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("BackgroundHash")
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ClientId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreateDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("CreateUserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("HideIdentity")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<byte[]>("Logo")
+                        .HasColumnType("BLOB");
+
+                    b.Property<string>("LogoContentType")
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LogoHash")
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdateDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("UpdateState")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("UpdateUserId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClientId")
+                        .IsUnique()
+                        .HasFilter("\"UpdateState\" <> 0");
+
+                    b.ToTable("ClientBranding", (string)null);
+                });
+
             modelBuilder.Entity("MatIdentity.Core.Entities.Group", b =>
                 {
                     b.Property<long>("Id")

@@ -205,7 +205,7 @@ public class EditModel : PageModel
         }
 
         var linkBase = await Support.Authority.GetAsync(HttpContext, _config, _configuration);
-        var sent = await _accounts.RequestPasswordResetAsync(user.Username, linkBase, HttpContext.RequestAborted) is not null;
+        var sent = await _accounts.RequestPasswordResetAsync(user.Username, linkBase, ct: HttpContext.RequestAborted) is not null;
         if (sent)
         {
             await _activity.WriteAsync(ActivityKind.PasswordResetSent, username: User.GetUsername(), ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString(),

@@ -1,0 +1,16 @@
+@{
+    // The logo on the card of a sign-in page: MatIdentity's, or the brand's (its logo, else the first letters of its name on its accent).
+    var brand = await SignInBranding.ResolveAsync(Context);
+}
+@if (brand is null)
+{
+    @Ui.Logo("lg")
+}
+else if (brand.LogoUrl is { } logo)
+{
+    <span class="mat-logo mat-logo--lg mi-logo mi-brand-logo" role="img" aria-label="@brand.Name"><img src="@logo" alt="" width="128" height="128" /></span>
+}
+else
+{
+    <span class="mat-logo mat-logo--lg mi-brand-mark" role="img" aria-label="@brand.Name">@brand.Letters</span>
+}

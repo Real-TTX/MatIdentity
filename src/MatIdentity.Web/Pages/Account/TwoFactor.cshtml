@@ -1,7 +1,7 @@
 @page
 @model MatIdentity.Web.Pages.Account.TwoFactorModel
 @{
-    Layout = "_Bare";
+    Layout = "_SignIn";
     ViewData["Title"] = "Second step";
     var lead = Model.HasAuthenticator
         ? "Enter the code of your authenticator app" + (Model.HasPasskey ? ", or use your passkey." : ".")
@@ -10,7 +10,7 @@
 
 <div class="mat-auth__card">
     <div class="mat-auth__brand">
-        @Ui.Logo("lg")
+        <partial name="_AuthLogo" />
         <h1>One more step</h1>
         <p class="mat-muted">@lead</p>
     </div>

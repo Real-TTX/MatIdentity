@@ -95,7 +95,8 @@ public class RegisterModel : PageModel
         }
 
         var displayName = string.IsNullOrWhiteSpace(Input.DisplayName) ? Input.Username.Trim() : Input.DisplayName.Trim();
-        if (await _accounts.RegisterAsync(Input.Username.Trim(), displayName, Input.Email.Trim(), Input.Password, linkBase, ct) is { } user)
+        var brand = (await SignInBranding.ResolveAsync(HttpContext))?.Info;
+        if (await _accounts.RegisterAsync(Input.Username.Trim(), displayName, Input.Email.Trim(), Input.Password, linkBase, brand, ct) is { } user)
         {
             await _activity.WriteAsync(ActivityKind.PersonCreated, user, ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString(), detail: user.Username + " (registered, not confirmed)", ct: ct);
         }

@@ -27,7 +27,8 @@ rulebook. The accent is `#a21a50` (registered in MatDesign's `AppRegistry`; `#9d
   `identity.oidc`: the definition is valid, a binding is a client with every address, the back-channel at the internal address, the roles of the app's `/api`, a secret
   once and renewed, the list, removal only with the mark, the Connections area by hand), `MailTests`, `AccountMailTests`, `RegistrationTests`,
   `BackchannelLogoutTests`, `LockoutTests`, `AuditTests`, `ExportTests`, `PeopleAccessTests` (permissions and quotas in the tokens, the group names for an app that asks for them, a change tells the app and revokes the renewal,
-  SCIM with the key and with the key of people.scim, the actions on a person, the page of a grant). The site runs with `MATSMTP_*` and a public address; its mail and back-channel requests are recorded
+  SCIM with the key and with the key of people.scim, the actions on a person, the page of a grant), `BrandingRulesTests` (the limits and types of a brand, where it comes from) and `BrandingTests`
+  (a branded sign-in has no trace of MatIdentity, every other stays as it was, an unknown app gives no brand, the SVG with its policy, the API, only the manager brands, Forgot -> mail -> Reset stays branded). The site runs with `MATSMTP_*` and a public address; its mail and back-channel requests are recorded
   (`RecordingMailTransport`, `RecordingHttpHandler`), and the apps it reads roles from answer from `IdentityFactory.AppDefinitions` (`AppDefinitionHandler`): nothing leaves
   the test. The site tests share one collection (environment variables).
 - **Run / test the app: always rebuild the container and redeploy the stack** (project rule): `./scripts/redeploy.ps1` (`-Fresh` wipes the volume and with it the token keys,
@@ -46,7 +47,7 @@ rulebook. The accent is `#a21a50` (registered in MatDesign's `AppRegistry`; `#9d
 
 ```
 src/MatIdentity.Core       domain, no web types
-  Entities/ Data/            User (Subject = the claim sub), UserSession, ActivityEntry, AccountToken (links in mails, hashed); DbContext (+ OpenIddict's tables Oidc*), migrations
+  Entities/ Data/            User (Subject = the claim sub), UserSession, ActivityEntry, AccountToken (links in mails, hashed), ClientBranding (the look of an app's sign-in, its pictures); DbContext (+ OpenIddict's tables Oidc*), migrations
   Auth/ Users/ Security/     sign-in and lockout, sessions in SQLite (ISessionEndListener, sid), TwoFactorService, PasskeyService, Totp, PBKDF2 hasher, secret protector;
                              AccountTokenService + AccountMailService (reset, invitation, verification, registration), PasswordPolicy
   Mail/                      MailService (MatSMTP or own SMTP), MailKit transport, MailQueue, MailTemplates
@@ -54,19 +55,22 @@ src/MatIdentity.Core       domain, no web types
                              every change that can change what someone ends up with tells the apps, IAccessChangeListener), AccessModels (AccessDecision with Permissions, Quotas, Via, Groups (names, when AppPolicy.SendsGroups);
                              PermissionInfo, QuotaInfo, GrantValues, AccessKeys), GroupService (a change of members goes through WatchAsync)
   Clients/                   ClientModels (ClientInfo, ClientRules, ClientUpsert), ClientService (the apps over OpenIddict, their scopes app:<id>; UpsertAsync and
-                             RemoveManagedAsync: the one way of /api/v1/clients and of the bindings of identity.oidc), TokenRevoker
+                             RemoveManagedAsync: the one way of /api/v1/clients and of the bindings of identity.oidc), TokenRevoker; BrandingModels (BrandInfo, BrandingInput, BrandingRules:
+                             the limits and types of a brand) + BrandingService (docs/ARCHITECTURE.md "Branded sign-in")
   Activity/                  ActivityService (the activity list, 90 days)
   Configuration/             options, AppPaths, JsonConfigStore, SystemConfig(+Service: the settings and their rules), ConfigurationExport (JSON without secrets)
 src/MatIdentity.Web        Razor Pages, controls, endpoints, Program.cs (OpenIddict, cookie, rate limits, forwarded headers)
   Infrastructure/            OidcEndpoints (authorize, token, userinfo, logout; the claims role, entitlements, mat_quotas, groups), BackchannelLogout (logout tokens to the apps: when sessions end and when a
                              person's access in an app changes), ScimEndpoints + ScimPeople (SCIM 2.0 at /scim/v2: users, groups, grants; the key everything, the key of people.scim the people of one app), LocalUrl, SignInFlow (the end of every sign-in, the second step), PasskeyEndpoints (WebAuthn), TokenKeys, ApiAccess (X-Api-Key or token for app:matidentity),
-                             IdentityBearerHandler (the scheme MatPlatform asks for a token: the same check), ClientApiEndpoints (/api/v1/clients with roles, permissions and quotas; /api/v1/people/{subject}/actions), RateLimits, session validation, setup and password guards, health check
+                             IdentityBearerHandler (the scheme MatPlatform asks for a token: the same check), ClientApiEndpoints (/api/v1/clients with roles, permissions, quotas and branding; /api/v1/people/{subject}/actions),
+                             SignInBranding (the brand of a sign-in: ?brand, the authorize request in returnUrl, the cookie mid.brand; ContinueTo), BrandingEndpoints (/branding/{clientId}/…), RateLimits, session validation, setup and password guards, health check
   MatPlatform/               a copy of MatDesign's MatPlatform 2.4.0 (tools/matplatform-copy.js; never edit here): AddMatPlatform/MapMatPlatform in Program.cs (/api, health, state, configure,
                              actions, /api/bindings, /api/connections, the form of <mat-connections />), MatSmtpSettings, MatFrameAncestors (MAT_FRAME_ANCESTORS)
   Platform/                  IdentityPlatform (MatIdentity's description: provides identity.oidc and people.scim, consumes mail.smtp; its values), IdentityBindings (IMatBindingHandler of identity.oidc:
                              a binding is a client, listed when it has a managedBy), AppRolesReader (the roles, permissions and quotas of an app's /api)
   Pages/                     Index (your apps; figures for an administrator), Apps/ (Edit, Access, Grant: the role, permissions and quotas of one grant), Users/ (People), Groups/, Activity/, Connections/ (<mat-connections />), Settings/, Account/ (Login, TwoFactor,
-                             NoAccess, Logout, Forgot, Reset, Verify, Register, Profile: general, password, devices; Security: authenticator app, recovery codes, passkeys), Setup, StatusCode (also the errors of the protocol), Error
+                             NoAccess, Logout, Forgot, Reset, Verify, Register, Profile: general, password, devices; Security: authenticator app, recovery codes, passkeys), Setup, StatusCode (also the errors of the protocol), Error;
+                             Shared/_SignIn (the layout of the sign-in pages: _Bare, or the whole page in the look of a branded app) + _AuthLogo
   Support/ Controls/         Ui (icons, logo, app letters and hues), Navigation, Crumbs, Format, Authority, Toolkit; tag helpers (mat-field, icon, tab-bar), ListModels
   wwwroot/                   matui/ (the toolkit, a copy), css/matidentity.css (mi-* only), js/matidentity.js, img/ (logo, favicon, PWA icons), manifest
 tests/MatIdentity.Tests     unit tests + the site in memory

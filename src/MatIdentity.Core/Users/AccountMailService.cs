@@ -1,4 +1,5 @@
 using MatIdentity.Core.Auth;
+using MatIdentity.Core.Clients;
 using MatIdentity.Core.Configuration;
 using MatIdentity.Core.Entities;
 using MatIdentity.Core.Mail;
@@ -40,7 +41,7 @@ public sealed class AccountMailService
     /// "Forgot your password?": a link to the address of the account, when there is an active account with an address for <paramref name="login"/> (user name
     /// or e-mail) and mail is set. The caller answers the same in every case. Returns the person a mail went to (for the activity list), or null.
     /// </summary>
-    public async Task<User?> RequestPasswordResetAsync(string login, string linkBase, CancellationToken ct = default)
+    public async Task<User?> RequestPasswordResetAsync(string login, string linkBase, BrandInfo? brand = null, CancellationToken ct = default)
     {
         var user = await _auth.FindAsync(login, ct);
         if (user is not { IsActive: true } || string.IsNullOrEmpty(user.Email) || !await _mail.IsAvailableAsync(ct)
@@ -50,7 +51,7 @@ public sealed class AccountMailService
         }
 
         var key = await _tokens.IssueAsync(user.Id, AccountTokenPurpose.PasswordReset, user.Email, ct);
-        _queue.Enqueue(MailTemplates.PasswordReset(user.Email, user.DisplayName, await InstanceAsync(ct), Link(linkBase, "Reset", key), AccountTokenService.ResetLifetime));
+        _queue.Enqueue(MailTemplates.PasswordReset(user.Email, user.DisplayName, await InstanceAsync(brand, ct), Link(linkBase, "Reset", key, brand), AccountTokenService.ResetLifetime));
         return user;
     }
 
@@ -63,7 +64,7 @@ public sealed class AccountMailService
         }
 
         var key = await _tokens.IssueAsync(user.Id, AccountTokenPurpose.Invitation, user.Email, ct);
-        var mail = MailTemplates.Invitation(user.Email, user.DisplayName, await InstanceAsync(ct), Link(linkBase, "Reset", key), AccountTokenService.InvitationLifetime, invitedBy);
+        var mail = MailTemplates.Invitation(user.Email, user.DisplayName, await InstanceAsync(null, ct), Link(linkBase, "Reset", key), AccountTokenService.InvitationLifetime, invitedBy);
         var error = await _mail.SendAsync(mail, ct);
         if (error is not null)
         {
@@ -74,7 +75,7 @@ public sealed class AccountMailService
     }
 
     /// <summary>A link that confirms the current address of <paramref name="user"/> (sent after the answer). False without an address, when it is confirmed, or without mail.</summary>
-    public async Task<bool> SendVerificationAsync(User user, string linkBase, CancellationToken ct = default)
+    public async Task<bool> SendVerificationAsync(User user, string linkBase, BrandInfo? brand = null, CancellationToken ct = default)
     {
         if (string.IsNullOrEmpty(user.Email) || user.EmailVerified || !await _mail.IsAvailableAsync(ct))
         {
@@ -82,7 +83,7 @@ public sealed class AccountMailService
         }
 
         var key = await _tokens.IssueAsync(user.Id, AccountTokenPurpose.EmailVerification, user.Email, ct);
-        _queue.Enqueue(MailTemplates.VerifyEmail(user.Email, user.DisplayName, await InstanceAsync(ct), Link(linkBase, "Verify", key), AccountTokenService.VerificationLifetime));
+        _queue.Enqueue(MailTemplates.VerifyEmail(user.Email, user.DisplayName, await InstanceAsync(brand, ct), Link(linkBase, "Verify", key, brand), AccountTokenService.VerificationLifetime));
         return true;
     }
 
@@ -90,7 +91,7 @@ public sealed class AccountMailService
     /// A person makes an account (registration is on): disabled until they follow the link to their address. An address that belongs to an account already gets
     /// nothing and the caller answers the same (no hint which addresses are known). The user name must be free (the caller checks it).
     /// </summary>
-    public async Task<User?> RegisterAsync(string username, string displayName, string email, string password, string linkBase, CancellationToken ct = default)
+    public async Task<User?> RegisterAsync(string username, string displayName, string email, string password, string linkBase, BrandInfo? brand = null, CancellationToken ct = default)
     {
         if (await _users.EmailExistsAsync(email, null, ct))
         {
@@ -98,7 +99,7 @@ public sealed class AccountMailService
         }
 
         var user = await _users.RegisterAsync(username, displayName, email, password, ct);
-        await SendVerificationAsync(user, linkBase, ct);
+        await SendVerificationAsync(user, linkBase, brand, ct);
         return user;
     }
 
@@ -155,7 +156,10 @@ public sealed class AccountMailService
 
     private static bool SameAddress(string? a, string? b) => !string.IsNullOrEmpty(a) && string.Equals(a.Trim(), b?.Trim(), StringComparison.OrdinalIgnoreCase);
 
-    private static string Link(string linkBase, string page, string key) => $"{linkBase.TrimEnd('/')}/Account/{page}?token={key}";
+    /// <summary>The link of a mail; a branded sign-in (docs/ARCHITECTURE.md "Branded sign-in") carries its brand, so the page of the link looks like the sign-in it came from.</summary>
+    private static string Link(string linkBase, string page, string key, BrandInfo? brand = null)
+        => $"{linkBase.TrimEnd('/')}/Account/{page}?token={key}" + (brand is null ? string.Empty : "&brand=" + Uri.EscapeDataString(brand.ClientId));
 
-    private async Task<string> InstanceAsync(CancellationToken ct) => (await _config.GetAsync(ct)).InstanceName;
+    /// <summary>The name the mails speak of: the app of a brand that hides MatIdentity, else the name of this MatIdentity.</summary>
+    private async Task<string> InstanceAsync(BrandInfo? brand, CancellationToken ct) => brand is { HideIdentity: true } ? brand.Name : (await _config.GetAsync(ct)).InstanceName;
 }

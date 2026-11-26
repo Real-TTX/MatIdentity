@@ -1,13 +1,13 @@
 @page
 @model MatIdentity.Web.Pages.Account.ResetModel
 @{
-    Layout = "_Bare";
+    Layout = "_SignIn";
     ViewData["Title"] = Model.IsInvitation ? "Welcome" : "New password";
 }
 
 <div class="mat-auth__card">
     <div class="mat-auth__brand">
-        @Ui.Logo("lg")
+        <partial name="_AuthLogo" />
         @if (Model.Link?.User is { } person)
         {
             <h1>@(Model.IsInvitation ? $"Welcome, {person.DisplayName}" : "Set a new password")</h1>

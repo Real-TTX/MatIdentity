@@ -48,7 +48,7 @@ public sealed class SetupGuardMiddleware
 /// <summary>The addresses the guards leave alone.</summary>
 public static class Paths
 {
-    private static readonly string[] Static = ["/css", "/js", "/img", "/matui", "/manifest.webmanifest", "/favicon.ico"];
+    private static readonly string[] Static = ["/css", "/js", "/img", "/matui", "/manifest.webmanifest", "/favicon.ico", "/branding"];
 
     /// <summary>Files, the platform API and the machine side of OpenID Connect (discovery, keys, token, user info).</summary>
     public static bool IsOpenBeforeSignIn(PathString path)

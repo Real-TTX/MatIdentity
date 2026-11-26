@@ -24,8 +24,14 @@ namespace MatIdentity.Web.Infrastructure;
 ///                                              roleMode: "matidentity" or "app", roles: [{ key, label }], openToEveryone, callsAllApps,
 ///                                              permissions: [{ key, label, hint, roles }], quotas: [{ key, label, unit, period, min, max, hint }],
 ///                                              callTargets: ["matsplit", "matidentity"] (by name; MatIdentity's own API only so),
-///                                              backchannelLogoutUri: where the app hears that a person signed out ("" removes it) }
-///                                            200 { client, clientSecret? }: the secret only when it was made now (a new app, or renewSecret: true)
+///                                              backchannelLogoutUri: where the app hears that a person signed out ("" removes it),
+///                                              branding: the look of its sign-in (docs/ARCHITECTURE.md "Branded sign-in"; missing keeps it, null removes it):
+///                                                { name, accent: "#rrggbb"?, hideIdentity, logo: { contentType: "image/svg+xml"|"image/png", data: Base64 }?,
+///                                                  background: { contentType: "image/jpeg"|"image/png"|"image/webp", data: Base64 }? }
+///                                                logo at most 256 KiB, background 2 MiB; a picture that is missing is kept, null removes it; 400 when it is not
+///                                                valid, 409 when the app carries another mark than managedBy (only its manager brands it) }
+///                                            200 { client, clientSecret?, ..., branding? }: the secret only when it was made now (a new app, or renewSecret: true)
+/// GET answers branding as { name, accent, hideIdentity, hasLogo, hasBackground, logoContentType, backgroundContentType, logoUrl, backgroundUrl } (never the data), or null.
 /// DELETE /api/v1/clients/{clientId}?managedBy=mattiverse   204, 404, or 409 when the app carries another mark
 /// POST   /api/v1/people/{subject}/actions/{action}          what SCIM has no word for: invite, resetPassword, signOut, unlock, resetSecondStep
 ///                                            200 { ok, message }, 404 for an unknown person or action, 409 when it cannot run now
@@ -43,21 +49,26 @@ public static class ClientApiEndpoints
 
         var api = app.MapGroup("/api/v1/clients").AllowAnonymous().AddEndpointFilter(ApiAccess.RequireAsync).DisableAntiforgery();
 
-        api.MapGet("/", async (ClientService clients, PermissionService permissions, CancellationToken ct) =>
+        api.MapGet("/", async (HttpContext http, ClientService clients, PermissionService permissions, BrandingService branding, CancellationToken ct) =>
         {
             var all = new JsonArray();
-            foreach (var client in await clients.GetAllAsync(ct))
+            var list = await clients.GetAllAsync(ct);
+            var brands = await branding.GetManyAsync(list.Select(c => c.ClientId).ToList(), ct);
+            var baseUrl = await BaseUrlAsync(http);
+            foreach (var client in list)
             {
-                all.Add(await WithAccessAsync(client, permissions, ct));
+                all.Add(await WithAccessAsync(client, permissions, brands.GetValueOrDefault(client.ClientId), baseUrl, ct));
             }
 
             return Results.Text(all.ToJsonString(options), "application/json");
         });
 
-        api.MapGet("/{clientId}", async (string clientId, ClientService clients, PermissionService permissions, CancellationToken ct) =>
-            await clients.GetAsync(clientId, ct) is { } client ? Results.Text((await WithAccessAsync(client, permissions, ct)).ToJsonString(options), "application/json") : NotFound(clientId));
+        api.MapGet("/{clientId}", async (string clientId, HttpContext http, ClientService clients, PermissionService permissions, BrandingService branding, CancellationToken ct) =>
+            await clients.GetAsync(clientId, ct) is { } client
+                ? Results.Text((await WithAccessAsync(client, permissions, await branding.GetAsync(clientId, ct), await BaseUrlAsync(http), ct)).ToJsonString(options), "application/json")
+                : NotFound(clientId));
 
-        api.MapPut("/{clientId}", async (string clientId, ClientBody body, HttpContext http, ClientService clients, PermissionService permissions, ActivityService activity, CancellationToken ct) =>
+        api.MapPut("/{clientId}", async (string clientId, ClientBody body, HttpContext http, ClientService clients, PermissionService permissions, BrandingService branding, ActivityService activity, CancellationToken ct) =>
         {
             // The same way as a binding of identity.oidc (ClientService.UpsertAsync): the rules first, the id and the roles checked before anything is saved.
             var roleMode = body.RoleMode switch { "app" => RoleMode.App, "matidentity" => RoleMode.MatIdentity, _ => (RoleMode?)null };
@@ -84,17 +95,54 @@ public static class ClientApiEndpoints
                 CallTargets = body.CallTargets,
             };
 
-            if (body.RoleMode is not null && roleMode is null)
+            // The look of its sign-in (docs/ARCHITECTURE.md "Branded sign-in"): checked with the rest, before anything is saved.
+            var brandChange = ParseBranding(body.Branding);
+            var brandErrors = brandChange.Errors;
+            if (brandChange.Input is { } brandInput)
+            {
+                foreach (var (key, message) in BrandingRules.Check(brandInput).Errors)
+                {
+                    brandErrors[key] = message;
+                }
+            }
+
+            if ((body.RoleMode is not null && roleMode is null) || brandErrors.Count > 0)
             {
                 var errors = ClientService.CheckUpsert(upsert);
-                errors["roleMode"] = "Use \"matidentity\" or \"app\".";
+                if (body.RoleMode is not null && roleMode is null)
+                {
+                    errors["roleMode"] = "Use \"matidentity\" or \"app\".";
+                }
+
+                foreach (var (key, message) in brandErrors)
+                {
+                    errors[key] = message;
+                }
+
                 return Results.Json(new { errors }, options, statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            // Only the one who manages an app gives it a look: an app an administrator made (no mark) without a mark, a broker's app with the broker's mark.
+            if (brandChange.Given && await clients.GetAsync(clientId, ct) is { } current
+                && !string.Equals(current.ManagedBy ?? string.Empty, body.ManagedBy ?? string.Empty, StringComparison.Ordinal))
+            {
+                return Results.Json(new { errors = new Dictionary<string, string> { ["branding"] = "Only the caller that manages this app sets the look of its sign-in: send its managedBy." } },
+                    options, statusCode: StatusCodes.Status409Conflict);
             }
 
             var (result, created) = await clients.UpsertAsync(upsert, ct);
             if (!result.Succeeded)
             {
                 return Results.Json(new { errors = result.Errors }, options, statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            if (brandChange.Input is { } input)
+            {
+                await branding.SaveAsync(clientId, input, ct);
+            }
+            else if (brandChange.Remove)
+            {
+                await branding.RemoveAsync(clientId, ct);
             }
 
             var caller = http.Items[ApiAccess.CallerKey] as string;
@@ -112,6 +160,7 @@ public static class ClientApiEndpoints
                 saved.OpenToEveryone,
                 saved.CallsAllApps,
                 saved.SendsGroups,
+                branding = BrandingNode(await branding.GetAsync(clientId, ct), await BaseUrlAsync(http)),
             }, options);
         });
 
@@ -140,8 +189,8 @@ public static class ClientApiEndpoints
             .AllowAnonymous().AddEndpointFilter(ApiAccess.RequireAsync).DisableAntiforgery();
     }
 
-    /// <summary>A client with what decides who may use it: role mode, open to everyone, roles, permissions and quotas.</summary>
-    private static async Task<JsonObject> WithAccessAsync(ClientInfo client, PermissionService permissions, CancellationToken ct)
+    /// <summary>A client with what decides who may use it: role mode, open to everyone, roles, permissions and quotas; and the look of its sign-in (null: none).</summary>
+    private static async Task<JsonObject> WithAccessAsync(ClientInfo client, PermissionService permissions, BrandInfo? brand, string baseUrl, CancellationToken ct)
     {
         var node = JsonSerializer.SerializeToNode(client, MatApiDefinition.Json)!.AsObject();
         var policy = await permissions.PolicyAsync(client.ClientId, ct);
@@ -151,7 +200,142 @@ public static class ClientApiEndpoints
         node["roles"] = JsonSerializer.SerializeToNode(await permissions.RolesAsync(client.ClientId, ct), MatApiDefinition.Json);
         node["permissions"] = JsonSerializer.SerializeToNode(await permissions.PermissionsAsync(client.ClientId, ct), MatApiDefinition.Json);
         node["quotas"] = JsonSerializer.SerializeToNode(await permissions.QuotasAsync(client.ClientId, ct), MatApiDefinition.Json);
+        node["branding"] = BrandingNode(brand, baseUrl);
         return node;
+    }
+
+    /// <summary>
+    /// The look of a sign-in as the API answers it: never the pictures themselves, only whether there are any and their addresses (absolute, with the version, so they
+    /// may be cached for a year).
+    /// </summary>
+    private static JsonObject? BrandingNode(BrandInfo? brand, string baseUrl)
+    {
+        if (brand is null)
+        {
+            return null;
+        }
+
+        return new JsonObject
+        {
+            ["name"] = brand.Name,
+            ["accent"] = brand.Accent,
+            ["hideIdentity"] = brand.HideIdentity,
+            ["hasLogo"] = brand.HasLogo,
+            ["hasBackground"] = brand.HasBackground,
+            ["logoContentType"] = brand.LogoContentType,
+            ["backgroundContentType"] = brand.BackgroundContentType,
+            ["logoUrl"] = brand.LogoHash is { } logo ? baseUrl + BrandingEndpoints.Path(brand.ClientId, "logo", logo) : null,
+            ["backgroundUrl"] = brand.BackgroundHash is { } background ? baseUrl + BrandingEndpoints.Path(brand.ClientId, "background", background) : null,
+        };
+    }
+
+    /// <summary>The address of MatIdentity for the addresses of the pictures: the public one, else the one of the request.</summary>
+    private static Task<string> BaseUrlAsync(HttpContext http)
+        => Support.Authority.GetAsync(http, http.RequestServices.GetRequiredService<SystemConfigService>(), http.RequestServices.GetRequiredService<IConfiguration>());
+
+    /// <summary>What a PUT says about the look of the sign-in.</summary>
+    private sealed record BrandingChange(bool Given, bool Remove, BrandingInput? Input, Dictionary<string, string> Errors);
+
+    /// <summary>
+    /// <c>branding</c> of a PUT: missing keeps the look, <c>null</c> removes it, an object sets it: <c>name</c>, <c>accent</c> (<c>#rrggbb</c> or null),
+    /// <c>hideIdentity</c>, and the pictures <c>logo</c> and <c>background</c> (<c>{ contentType, data }</c>, data as Base64), each kept when missing and removed with null.
+    /// </summary>
+    private static BrandingChange ParseBranding(JsonElement branding)
+    {
+        var errors = new Dictionary<string, string>();
+        switch (branding.ValueKind)
+        {
+            case JsonValueKind.Undefined:
+                return new BrandingChange(false, false, null, errors);
+            case JsonValueKind.Null:
+                return new BrandingChange(true, true, null, errors);
+            case JsonValueKind.Object:
+                break;
+            default:
+                errors["branding"] = "Give the look of the sign-in as an object, or null to remove it.";
+                return new BrandingChange(true, false, null, errors);
+        }
+
+        string? Text(string name, string field)
+        {
+            if (!Property(branding, name, out var value) || value.ValueKind == JsonValueKind.Null)
+            {
+                return null;
+            }
+
+            if (value.ValueKind != JsonValueKind.String)
+            {
+                errors[field] = $"\"{name}\" must be text.";
+                return null;
+            }
+
+            return value.GetString();
+        }
+
+        var hide = false;
+        if (Property(branding, "hideIdentity", out var hideValue) && hideValue.ValueKind != JsonValueKind.Null)
+        {
+            if (hideValue.ValueKind is JsonValueKind.True or JsonValueKind.False)
+            {
+                hide = hideValue.GetBoolean();
+            }
+            else
+            {
+                errors["branding.hideIdentity"] = "\"hideIdentity\" must be true or false.";
+            }
+        }
+
+        var (logo, removeLogo) = Picture("logo");
+        var (background, removeBackground) = Picture("background");
+        var input = new BrandingInput
+        {
+            Name = Text("name", "branding.name"),
+            Accent = Text("accent", "branding.accent"),
+            HideIdentity = hide,
+            Logo = logo,
+            RemoveLogo = removeLogo,
+            Background = background,
+            RemoveBackground = removeBackground,
+        };
+        return new BrandingChange(true, false, errors.Count == 0 ? input : null, errors);
+
+        (BrandImageInput? Image, bool Remove) Picture(string name)
+        {
+            if (!Property(branding, name, out var value))
+            {
+                return (null, false);
+            }
+
+            if (value.ValueKind == JsonValueKind.Null)
+            {
+                return (null, true);
+            }
+
+            if (value.ValueKind != JsonValueKind.Object)
+            {
+                errors["branding." + name] = $"Give the {name} as {{ contentType, data }} (data as Base64), or null to remove it.";
+                return (null, false);
+            }
+
+            var type = Property(value, "contentType", out var t) && t.ValueKind == JsonValueKind.String ? t.GetString() : null;
+            var data = Property(value, "data", out var d) && d.ValueKind == JsonValueKind.String ? d.GetString() : null;
+            return (new BrandImageInput(type, data), false);
+        }
+
+        static bool Property(JsonElement element, string name, out JsonElement value)
+        {
+            foreach (var property in element.EnumerateObject())
+            {
+                if (string.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase))
+                {
+                    value = property.Value;
+                    return true;
+                }
+            }
+
+            value = default;
+            return false;
+        }
     }
 
     /// <summary><c>invite</c>, <c>resetPassword</c>, <c>signOut</c>, <c>unlock</c> or <c>resetSecondStep</c> for the person with the subject <paramref name="subject"/>.</summary>
@@ -191,7 +375,7 @@ public static class ClientApiEndpoints
                 : (true, $"The invitation is on its way to {user.Email}."),
             "resetPassword" => string.IsNullOrEmpty(user.Email)
                 ? (false, "The person has no e-mail address.")
-                : await accounts.RequestPasswordResetAsync(user.Username, linkBase, ct) is not null
+                : await accounts.RequestPasswordResetAsync(user.Username, linkBase, ct: ct) is not null
                     ? (true, $"A link for a new password is on its way to {user.Email}.")
                     : (false, $"No link was sent: the account is disabled, or it got {AccountMailService.MaxResetsPerHour} links in the last hour."),
             "signOut" => (true, $"Signed out everywhere ({await sessions.InvalidateAllAsync(user.Id, ct: ct)} sessions, {await revoker.RevokeForSubjectAsync(user.Subject, ct)} app sign-ins)."),
@@ -252,7 +436,8 @@ public static class ClientApiEndpoints
         string? BackchannelLogoutUri = null,
         IReadOnlyList<PermissionBody>? Permissions = null,
         IReadOnlyList<QuotaBody>? Quotas = null,
-        bool? SendsGroups = null);
+        bool? SendsGroups = null,
+        JsonElement Branding = default);
 
     public sealed record RoleBody(string? Key, string? Label);
 

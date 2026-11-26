@@ -68,3 +68,19 @@
 .mi-qr { align-self: flex-start; padding: var(--mat-space-3); background: var(--mat-picker-light); /* the toolkit's white that stays white in the dark theme */ border: 1px solid var(--mat-border); border-radius: var(--mat-radius); line-height: 0; }
 .mi-qr img { display: block; width: 240px; max-width: 100%; height: auto; }
 .mi-codes { margin: 0; columns: 2; font-size: var(--mat-fs-md); letter-spacing: .05em; }
+
+/* ---- A branded sign-in (docs/ARCHITECTURE.md "Branded sign-in"): the page of the app whose sign-in it is ----
+   /branding/{id}/theme.css sets the accent ([data-app="brand"]) and, when the app has one, its picture (--mi-brand-image); without it a calm gradient from the accent. */
+.mat-auth.mi-brand {
+  background:
+    var(--mi-brand-image, none) center / cover no-repeat,
+    radial-gradient(120% 90% at 15% 0%, color-mix(in oklab, var(--mat-accent) 30%, var(--mat-bg)), transparent 70%),
+    linear-gradient(160deg, color-mix(in oklab, var(--mat-accent) 14%, var(--mat-bg)), var(--mat-bg));
+  background-attachment: fixed;
+}
+/* The card stands on a picture: lifted a little, like a dialog. */
+.mi-brand .mat-auth__card { box-shadow: var(--mat-shadow-2); }
+/* A logo of any shape keeps its proportions in the tile. */
+.mi-brand-logo img { object-fit: contain; }
+/* No logo: the first letters of the name on the accent. */
+.mi-brand-mark { font-size: var(--mat-fs-lg); font-weight: 700; letter-spacing: .02em; }

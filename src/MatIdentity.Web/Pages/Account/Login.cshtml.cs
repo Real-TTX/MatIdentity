@@ -87,7 +87,7 @@ public class LoginModel : PageModel
     {
         if (User.Identity?.IsAuthenticated == true && !Force)
         {
-            return LocalRedirect(SafeReturnUrl());
+            return Continue();
         }
 
         await LoadAsync();
@@ -127,7 +127,7 @@ public class LoginModel : PageModel
         await SignInFlow.CompleteAsync(HttpContext, result.User, Input.RememberMe, how: "with the password");
 
         // A forced password change lands on the account page via the guard middleware (and comes back here afterwards).
-        return LocalRedirect(SafeReturnUrl());
+        return Continue();
     }
 
     private async Task LoadAsync()
@@ -136,6 +136,9 @@ public class LoginModel : PageModel
         CanReset = await ForgotModel.LinkBaseAsync(HttpContext, _mail, _config, _configuration) is not null;
         CanRegister = CanReset && await RegisterModel.OfferedAsync(HttpContext, _mail, _config, _configuration);
     }
+
+    /// <summary>On to the request the sign-in is for; without one, to the app of a branded sign-in (SignInBranding.ContinueTo), else home. Never to an address the browser named.</summary>
+    private RedirectResult Continue() => Redirect(SignInBranding.ContinueTo(HttpContext, SafeReturnUrl()));
 
     private string SafeReturnUrl()
         => !string.IsNullOrEmpty(ReturnUrl) && Url.IsLocalUrl(ReturnUrl) ? ReturnUrl : "/";

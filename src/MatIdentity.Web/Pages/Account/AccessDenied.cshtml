@@ -1,14 +1,20 @@
 @page
 @{
-    Layout = "_Bare";
+    Layout = "_SignIn";
     ViewData["Title"] = "Access denied";
+    // A brand that hides MatIdentity: back to its app, never to MatIdentity's own home page.
+    var brand = await SignInBranding.ResolveAsync(HttpContext);
+    var home = brand is { HideIdentity: true } ? brand.HomeUrl : "/";
 }
 
 <div class="mat-auth__card">
     <div class="mat-auth__brand">
-        @Ui.Logo("lg")
+        <partial name="_AuthLogo" />
         <h1>Access denied</h1>
         <p class="mat-muted">You do not have the permissions to open this page.</p>
     </div>
-    <a href="/" class="mat-btn mat-btn--primary mat-btn--block"><icon name="home" /><span>Back to Home</span></a>
+    @if (home is not null)
+    {
+        <a href="@home" class="mat-btn mat-btn--primary mat-btn--block"><icon name="home" /><span>@(brand is { HideIdentity: true } ? $"Back to {brand.Name}" : "Back to Home")</span></a>
+    }
 </div>

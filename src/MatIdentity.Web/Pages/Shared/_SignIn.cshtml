@@ -1,0 +1,50 @@
+@inject Toolkit Toolkit
+@{
+    // The pages of a sign-in (Login, Forgot, Reset, TwoFactor, Register, Verify, NoAccess, AccessDenied): _Bare, unless the sign-in belongs to an app with a brand
+    // (SignInBranding, docs/ARCHITECTURE.md "Branded sign-in"). Then the page is the app's: its name in the title, its icon, its accent and background
+    // (theme.css of the brand), and none of MatIdentity's own name, logo, manifest or colour.
+    var brand = await SignInBranding.ResolveAsync(Context);
+    if (brand is null)
+    {
+        Layout = "_Bare";
+    }
+
+    var title = ViewData["Title"] as string;
+    var theme = User.Identity?.IsAuthenticated == true ? User.GetTheme() : "system";
+}
+@if (brand is null)
+{
+    @RenderBody()
+}
+else
+{
+<!DOCTYPE html>
+<html lang="en" data-app="brand" @(theme is "light" or "dark" ? Html.Raw($"data-theme=\"{theme}\"") : null)>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    @if (brand.Info.Accent is { } accent)
+    {
+        <meta name="theme-color" content="@accent" />
+    }
+    <title>@(string.IsNullOrEmpty(title) ? brand.Name : $"{title} · {brand.Name}")</title>
+    <link rel="icon" href="@brand.IconUrl" type="@brand.IconType" />
+    <meta name="application-name" content="@brand.Name" />
+    <meta name="apple-mobile-web-app-title" content="@brand.Name" />
+    <script src="~/matui/matui.boot.js" asp-append-version="true"></script>
+    <link rel="stylesheet" href="~/matui/matui.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/matidentity.css" asp-append-version="true" />
+    <link rel="stylesheet" href="@brand.ThemeUrl" />
+</head>
+<body>
+    <a class="mat-skip" href="#main">Skip to the content</a>
+    @Html.Raw(Toolkit.Sprite)
+    <main class="mat-auth mi-brand" id="main">
+        @RenderBody()
+    </main>
+    <script src="~/matui/matui.js" asp-append-version="true"></script>
+    <script src="~/js/matidentity.js" asp-append-version="true"></script>
+</body>
+</html>
+}

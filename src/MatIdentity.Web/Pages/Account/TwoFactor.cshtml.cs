@@ -97,7 +97,7 @@ public class TwoFactorModel : PageModel
         }
 
         await SignInFlow.CompleteAsync(HttpContext, user, pending.Value.Remember, recovery ? "with a recovery code" : "with the authenticator app");
-        return LocalRedirect(!string.IsNullOrEmpty(ReturnUrl) && Url.IsLocalUrl(ReturnUrl) ? ReturnUrl : "/");
+        return Redirect(SignInBranding.ContinueTo(HttpContext, !string.IsNullOrEmpty(ReturnUrl) && Url.IsLocalUrl(ReturnUrl) ? ReturnUrl : "/"));
     }
 
     private async Task<User?> LoadAsync()

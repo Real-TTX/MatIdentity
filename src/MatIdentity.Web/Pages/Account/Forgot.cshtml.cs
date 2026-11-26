@@ -59,7 +59,9 @@ public class ForgotModel : PageModel
             return Page();
         }
 
-        if (await _accounts.RequestPasswordResetAsync(Login, linkBase, HttpContext.RequestAborted) is { } user)
+        // A branded sign-in (MatOS) carries its brand into the mail: the link opens the page in its look, and the mail speaks of the app when it hides MatIdentity.
+        var brand = (await SignInBranding.ResolveAsync(HttpContext))?.Info;
+        if (await _accounts.RequestPasswordResetAsync(Login, linkBase, brand, HttpContext.RequestAborted) is { } user)
         {
             await _activity.WriteAsync(ActivityKind.PasswordResetSent, user, ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString(), ct: HttpContext.RequestAborted);
         }

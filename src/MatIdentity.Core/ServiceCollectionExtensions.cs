@@ -42,6 +42,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<AccountTokenService>();
         services.AddScoped<AccountMailService>();
         services.AddScoped<ActivityService>();
+        services.AddScoped<BrandingService>();
         services.AddScoped<ClientService>();
         services.AddScoped<TokenRevoker>();
         services.TryAddScoped<MatIdentity.Core.Access.IAccessChangeListener, MatIdentity.Core.Access.NoAccessChangeListener>();

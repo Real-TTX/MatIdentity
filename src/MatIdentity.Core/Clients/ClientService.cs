@@ -21,12 +21,14 @@ public sealed class ClientService
     private readonly IOpenIddictApplicationManager _applications;
     private readonly IOpenIddictScopeManager _scopes;
     private readonly PermissionService _permissions;
+    private readonly BrandingService? _branding;
 
-    public ClientService(IOpenIddictApplicationManager applications, IOpenIddictScopeManager scopes, PermissionService permissions)
+    public ClientService(IOpenIddictApplicationManager applications, IOpenIddictScopeManager scopes, PermissionService permissions, BrandingService? branding = null)
     {
         _applications = applications;
         _scopes = scopes;
         _permissions = permissions;
+        _branding = branding;
     }
 
     public async Task<List<ClientInfo>> GetAllAsync(CancellationToken ct = default)
@@ -281,6 +283,12 @@ public sealed class ClientService
 
         await _applications.DeleteAsync(app, ct);
         await _permissions.RemoveAppAsync(clientId, ct);
+        // The look of its sign-in goes with it: a new app of the same id starts without it.
+        if (_branding is not null)
+        {
+            await _branding.RemoveAsync(clientId, ct);
+        }
+
         if (await _scopes.FindByNameAsync(ClientRules.AppScope(clientId), ct) is { } scope)
         {
             await _scopes.DeleteAsync(scope, ct);
