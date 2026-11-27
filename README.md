@@ -261,10 +261,11 @@ docker compose -f docker-compose.dev.yml up -d --build    # development stack (a
 ### Connecting an app
 
 In *Apps → Add an app*: the id (`matsplit`), the address and the sign-in address of the app (ASP.NET Core: `https://split.example.com/signin-oidc`).
-MatIdentity shows the variables once:
+MatIdentity shows the variables once (the authority is the issuer exactly as the discovery document names it, with the slash at the end: a strict
+OpenID Connect client compares the two; MatPlatform takes it with or without):
 
 ```
-MATIDENTITY_AUTHORITY=https://id.example.com
+MATIDENTITY_AUTHORITY=https://id.example.com/
 MATIDENTITY_CLIENT_ID=matsplit
 MATIDENTITY_CLIENT_SECRET=...
 ```
@@ -326,7 +327,7 @@ PUT /api/bindings/identity.oidc/matdrive
   "provider": { "url": "https://id.example.com", "internalUrl": "http://mattiverse-matidentity-matidentity:2300" },
   "params": {}, "renew": false }
 
-200 { "variables": { "MATIDENTITY_AUTHORITY": "https://id.example.com", "MATIDENTITY_INTERNAL_URL": "http://mattiverse-matidentity-matidentity:2300",
+200 { "variables": { "MATIDENTITY_AUTHORITY": "https://id.example.com/", "MATIDENTITY_INTERNAL_URL": "http://mattiverse-matidentity-matidentity:2300",
                      "MATIDENTITY_CLIENT_ID": "matdrive", "MATIDENTITY_CLIENT_SECRET": "…" } }
 ```
 

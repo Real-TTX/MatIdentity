@@ -112,8 +112,9 @@ public sealed class IdentityBindings(
         await WriteAsync(created ? ActivityKind.ClientCreated : saved.Secret is null ? ActivityKind.ClientChanged : ActivityKind.ClientSecretRenewed, clientId, request.ManagedBy, ct);
         return new MatBindResult(new Dictionary<string, string?>
         {
-            // The issuer of the tokens: the public address of MatIdentity, else the address the broker (or the request) names.
-            ["authority"] = await Authority.PublicAsync(config, configuration, ct) ?? request.Provider.Url?.TrimEnd('/'),
+            // The issuer of the tokens: the public address of MatIdentity, else the address the broker (or the request) names; as the discovery document
+            // names it (with the slash at the end), so an app that compares the two finds them equal.
+            ["authority"] = (await Authority.PublicAsync(config, configuration, ct) ?? request.Provider.Url) is { Length: > 0 } authority ? Authority.IssuerOf(authority) : null,
             ["internalUrl"] = request.Provider.InternalUrl,
             ["clientId"] = clientId,
             ["clientSecret"] = saved.Secret,

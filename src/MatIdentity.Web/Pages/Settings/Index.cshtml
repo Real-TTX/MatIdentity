@@ -104,7 +104,7 @@
     <div class="mat-card__head"><icon name="link" /><span class="mat-card__title">Connecting apps</span></div>
     <div class="mat-card__body">
         <dl class="mat-kv">
-            <dt>Authority</dt><dd class="mat-mono">@Model.AuthorityUrl</dd>
+            <dt>Issuer</dt><dd class="mat-mono">@MatIdentity.Web.Support.Authority.IssuerOf(Model.AuthorityUrl)</dd>
             <dt>Discovery</dt><dd class="mat-mono">@Model.AuthorityUrl/.well-known/openid-configuration</dd>
             <dt>Platform API</dt><dd>@(Model.ApiKeyEnabled ? "On: with the key MAT_API_KEY or a token for app:matidentity" : "Only with a token for app:matidentity (MAT_API_KEY is not set)")</dd>
         </dl>

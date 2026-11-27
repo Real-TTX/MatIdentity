@@ -5,7 +5,7 @@
     ViewData["PageSub"] = Model.IsEdit ? "Who may sign in through it, and where it sends people back to." : "An app whose people sign in through MatIdentity, or that calls other apps.";
     ViewData["Crumbs"] = Crumbs.Of(("Apps", "/Apps"), (Model.IsEdit ? Model.Input.DisplayName : "Add an app", null));
     ViewData["Width"] = "narrow";
-    var env = $"MATIDENTITY_AUTHORITY={Model.AuthorityUrl}\nMATIDENTITY_CLIENT_ID={Model.Input.ClientId}" + (Model.NewSecret is null ? string.Empty : $"\nMATIDENTITY_CLIENT_SECRET={Model.NewSecret}");
+    var env = $"MATIDENTITY_AUTHORITY={MatIdentity.Web.Support.Authority.IssuerOf(Model.AuthorityUrl)}\nMATIDENTITY_CLIENT_ID={Model.Input.ClientId}" + (Model.NewSecret is null ? string.Empty : $"\nMATIDENTITY_CLIENT_SECRET={Model.NewSecret}");
 }
 
 @if (Model.NewSecret is not null)
@@ -139,6 +139,7 @@ else
                 <p class="mat-muted">An app of the family needs these variables (and the secret it got when it was added). Any other app that speaks OpenID Connect finds everything at the discovery address.</p>
                 <pre class="mat-code mi-env" id="app-env">@env</pre>
                 <dl class="mat-kv">
+                    <dt>Issuer</dt><dd class="mat-mono">@MatIdentity.Web.Support.Authority.IssuerOf(Model.AuthorityUrl)</dd>
                     <dt>Discovery</dt><dd class="mat-mono">@Model.AuthorityUrl/.well-known/openid-configuration</dd>
                     <dt>Scopes</dt><dd class="mat-mono">openid profile email roles offline_access</dd>
                     <dt>Its API</dt><dd class="mat-mono">app:@Model.Input.ClientId</dd>

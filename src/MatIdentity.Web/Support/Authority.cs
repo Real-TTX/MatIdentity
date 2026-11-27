@@ -24,6 +24,13 @@ public static class Authority
         return string.IsNullOrWhiteSpace(issuer) ? null : issuer.Trim().TrimEnd('/');
     }
 
+    /// <summary>
+    /// An address of MatIdentity as its issuer: with the slash at the end, exactly as the discovery document and the tokens name it (OpenIddict writes the
+    /// issuer as an absolute URI). What an app is told to compare with the issuer (the authority of a binding) has this form: a strict client (Vaultwarden,
+    /// openid-client) refuses the address without the slash. Links are built from the address without it.
+    /// </summary>
+    public static string IssuerOf(string address) => address.Trim().TrimEnd('/') + "/";
+
     public static async Task<string> GetAsync(HttpContext http, SystemConfigService config, IConfiguration configuration)
         => await PublicAsync(config, configuration, http.RequestAborted)
            ?? $"{http.Request.Scheme}://{http.Request.Host}{http.Request.PathBase}".TrimEnd('/');

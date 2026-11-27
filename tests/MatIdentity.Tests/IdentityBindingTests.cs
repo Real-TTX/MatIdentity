@@ -100,6 +100,18 @@ public sealed partial class IdentityBindingTests
     }
 
     [Fact]
+    public async Task The_authority_of_a_binding_is_the_issuer_exactly_as_the_discovery_document_names_it()
+    {
+        // A strict client (Vaultwarden, openid-client) compares the address it was given with the issuer of the discovery document, character for character.
+        var variables = await BindAsync("strictapp", Body("Strict app"));
+        var discovery = JsonDocument.Parse(await _site.CreateClient().GetStringAsync("/.well-known/openid-configuration")).RootElement;
+        Assert.Equal(discovery.GetProperty("issuer").GetString(), variables.GetProperty("MATIDENTITY_AUTHORITY").GetString());
+
+        Assert.Equal("https://id.example.test/", MatIdentity.Web.Support.Authority.IssuerOf("https://id.example.test"));
+        Assert.Equal("https://id.example.test/", MatIdentity.Web.Support.Authority.IssuerOf(" https://id.example.test// "));
+    }
+
+    [Fact]
     public async Task A_binding_is_a_client_for_every_address_with_the_back_channel_at_the_internal_one_and_the_roles_of_the_app()
     {
         // The app names its roles in its /api (contract 2, with members MatIdentity does not know); MatIdentity reads them at the internal address.
@@ -114,7 +126,7 @@ public sealed partial class IdentityBindingTests
         Assert.Equal(
             ["MATIDENTITY_AUTHORITY", "MATIDENTITY_INTERNAL_URL", "MATIDENTITY_CLIENT_ID", "MATIDENTITY_CLIENT_SECRET"],
             variables.EnumerateObject().Select(p => p.Name).ToArray());
-        Assert.Equal("http://localhost", variables.GetProperty("MATIDENTITY_AUTHORITY").GetString());
+        Assert.Equal("http://localhost/", variables.GetProperty("MATIDENTITY_AUTHORITY").GetString());
         Assert.Equal("http://mattiverse-matidentity-matidentity:2300", variables.GetProperty("MATIDENTITY_INTERNAL_URL").GetString());
         Assert.Equal("matdrive", variables.GetProperty("MATIDENTITY_CLIENT_ID").GetString());
         var secret = variables.GetProperty("MATIDENTITY_CLIENT_SECRET").GetString()!;
@@ -273,7 +285,7 @@ public sealed partial class IdentityBindingTests
         Assert.Contains("Connected: MatDrive Hand", connected);
         var secret = Value(connected, "MATIDENTITY_CLIENT_SECRET");
         Assert.Equal("matdrive-hand", Value(connected, "MATIDENTITY_CLIENT_ID"));
-        Assert.Equal("http://localhost", Value(connected, "MATIDENTITY_AUTHORITY"));
+        Assert.Equal("http://localhost/", Value(connected, "MATIDENTITY_AUTHORITY"));
         Assert.Equal(HttpStatusCode.BadRequest, await TokenEndpointAsync("matdrive-hand", secret));
 
         // Once: the next view shows the connection, not the secret.
