@@ -5,6 +5,11 @@
     ViewData["PageSub"] = "Who you are in all Mat apps, your password, the second step and your devices.";
     ViewData["Crumbs"] = Crumbs.Of(("Account", null));
     ViewData["Width"] = "narrow";
+    if (Model.Brand is not null)
+    {
+        // Opened from the link of an app with a brand (MatOS's account): in its look, without MatIdentity's menu.
+        Layout = "_BrandedAccount";
+    }
 }
 
 @if (Model.MustChange)
@@ -35,7 +40,7 @@
             <p class="mat-hint">The apps see your display name, your e-mail and your role. An administrator changes them.</p>
             @if (Model.CanVerify)
             {
-                <form method="post" asp-page-handler="SendVerification">
+                <form method="post" asp-page-handler="SendVerification" asp-route-brand="@Model.BrandId">
                     <button type="submit" class="mat-btn mat-btn--secondary"><icon name="mail" /><span>Confirm the address</span></button>
                 </form>
             }
@@ -65,7 +70,7 @@ else if (Model.ActiveTab == "password")
 
         <div class="mat-btn-row">
             <button type="submit" class="mat-btn mat-btn--primary"><icon name="save" /><span>Save</span></button>
-            <a href="/Account/Profile" class="mat-btn mat-btn--secondary"><icon name="back" /><span>Back</span></a>
+            <a href="@ProfileModel.AccountUrl("/Account/Profile", Model.BrandId)" class="mat-btn mat-btn--secondary"><icon name="back" /><span>Back</span></a>
         </div>
     </form>
 }
@@ -100,7 +105,7 @@ else
         <div class="mat-actions">
             @if (Model.Sessions.Count > 1)
             {
-                <form method="post" asp-page-handler="SignOutOthers" data-confirm="Sign out on every other device? The apps there ask you to sign in again." data-confirm-ok="Sign out" data-confirm-danger>
+                <form method="post" asp-page-handler="SignOutOthers" asp-route-brand="@Model.BrandId"data-confirm="Sign out on every other device? The apps there ask you to sign in again." data-confirm-ok="Sign out" data-confirm-danger>
                     <button type="submit" class="mat-btn mat-btn--danger"><icon name="logout" /><span>Sign out on other devices</span></button>
                 </form>
             }

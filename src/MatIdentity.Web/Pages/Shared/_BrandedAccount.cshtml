@@ -1,0 +1,66 @@
+@inject Toolkit Toolkit
+@{
+    // The account (Profile, Security) opened from the link of an app with a brand (SignInBranding.AccountBrandAsync, docs/ARCHITECTURE.md "Branded sign-in"):
+    // the page is the app's (_BrandHead), without MatIdentity's menu, name or logo; a bar with the app's name and the way back to it, then the page.
+    var brand = (await SignInBranding.AccountBrandAsync(Context))!;
+    var title = ViewData["Title"] as string ?? brand.Name;
+    var sub = ViewData["PageSub"] as string;
+    var theme = User.GetTheme();
+    var flash = TempData["StatusMessage"] as string;
+    var flashIsError = TempData["IsError"] is true;
+}
+<!DOCTYPE html>
+<html lang="en" data-app="brand" @(theme is "light" or "dark" ? Html.Raw($"data-theme=\"{theme}\"") : null)>
+<partial name="_BrandHead" model="brand" />
+<body>
+    <a class="mat-skip" href="#main">Skip to the content</a>
+    @Html.Raw(Toolkit.Sprite)
+    <div class="mi-brand mi-brand-page">
+        <header class="mi-brand-bar">
+            <span class="mi-brand-bar__name">
+                @if (brand.LogoUrl is { } logo)
+                {
+                    <span class="mat-logo mi-logo mi-brand-logo" aria-hidden="true"><img src="@logo" alt="" width="38" height="38" /></span>
+                }
+                else
+                {
+                    <span class="mat-logo mi-brand-mark mi-brand-mark--sm" aria-hidden="true">@brand.Letters</span>
+                }
+                <span>@brand.Name</span>
+            </span>
+            @if (brand.HomeUrl is { Length: > 0 } home)
+            {
+                <a class="mat-btn mat-btn--secondary mat-btn--sm" href="@home"><icon name="back" /><span>Back to @brand.Name</span></a>
+            }
+        </header>
+
+        <main class="mat-page mat-page--narrow" id="main">
+            @if (!string.IsNullOrEmpty(flash) && flashIsError)
+            {
+                <div class="mat-alert mat-alert--danger" role="alert"><icon name="x-circle" /><div class="mat-alert__body">@flash</div></div>
+            }
+
+            <div class="mat-page__head">
+                <div class="mat-page__title">
+                    <h1>@title</h1>
+                    @if (!string.IsNullOrEmpty(sub))
+                    {
+                        <p class="mat-page__sub">@sub</p>
+                    }
+                </div>
+            </div>
+
+            @RenderBody()
+        </main>
+    </div>
+
+    @if (!string.IsNullOrEmpty(flash) && !flashIsError)
+    {
+        <div data-toast="@flash" data-tone="success" hidden></div>
+    }
+
+    <script src="~/matui/matui.js" asp-append-version="true"></script>
+    <script src="~/js/matidentity.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

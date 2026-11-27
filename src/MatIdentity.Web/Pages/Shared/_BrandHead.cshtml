@@ -1,0 +1,23 @@
+@model SignInBrand
+@{
+    // The <head> of a page in the look of an app with a brand (_SignIn, _BrandedAccount): its name in the title, its icon, its accent (theme.css of the brand),
+    // and none of MatIdentity's own name, logo, manifest or colour. ViewData["Title"] is the page.
+    var title = ViewData["Title"] as string;
+}
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    @if (Model.Info.Accent is { } accent)
+    {
+        <meta name="theme-color" content="@accent" />
+    }
+    <title>@(string.IsNullOrEmpty(title) ? Model.Name : $"{title} · {Model.Name}")</title>
+    <link rel="icon" href="@Model.IconUrl" type="@Model.IconType" />
+    <meta name="application-name" content="@Model.Name" />
+    <meta name="apple-mobile-web-app-title" content="@Model.Name" />
+    <script src="~/matui/matui.boot.js" asp-append-version="true"></script>
+    <link rel="stylesheet" href="~/matui/matui.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/matidentity.css" asp-append-version="true" />
+    <link rel="stylesheet" href="@Model.ThemeUrl" />
+</head>

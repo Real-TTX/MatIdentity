@@ -381,6 +381,57 @@ public sealed partial class BrandingTests
         Assert.Contains("&brand=matos-mail", invitation.Text);
     }
 
+    [Fact]
+    public async Task The_account_opened_from_a_link_of_the_app_is_in_its_look_and_keeps_it()
+    {
+        await BrandAsync("matos-account");
+        await RegisterAsync("plain-account", branding: null);
+        await CreatePersonAsync("brandaccount", mustChange: false);
+        var browser = _site.Browser();
+        await IdentityFactory.SignInAsync(browser, "/Account/Login", "brandaccount", "Person-Pass-1");
+
+        // The second step, as MatOS's tab Security links it: the app's look, its way back, nothing of MatIdentity, every link and form keeps the brand.
+        var security = await browser.GetStringAsync("/Account/Security?brand=matos-account");
+        Assert.Contains("data-app=\"brand\"", security);
+        Assert.Contains("mi-brand-page", security);
+        Assert.Contains("/branding/matos-account/theme.css?v=", security);
+        Assert.Contains("<title>Account · MatOS</title>", WebUtility.HtmlDecode(security));
+        Assert.Contains($"href=\"{Home}\"", security);
+        Assert.Contains("Back to MatOS", security);
+        Assert.Contains("Authenticator app", security);
+        Assert.Contains("data-passkey-register", security);
+        Assert.Contains("/Account/Security?brand=matos-account&amp;handler=Begin", security);
+        Assert.Contains("/Account/Profile?tab=password&amp;brand=matos-account", security);
+        Assert.DoesNotContain("mat-nav", security);
+        AssertNoIdentity(security);
+
+        // Setting up the app goes on in the look, and the authenticator app shows the app's name.
+        var begin = await IdentityFactory.PostFormAsync(browser, "/Account/Security?brand=matos-account", new(), "/Account/Security?handler=Begin&brand=matos-account");
+        Assert.Equal(HttpStatusCode.Redirect, begin.StatusCode);
+        var setup = begin.Headers.Location!.OriginalString;
+        Assert.Contains("brand=matos-account", setup);
+        var scan = await browser.GetStringAsync(setup);
+        Assert.Contains("QR code for your authenticator app", scan);
+        Assert.Contains("/Account/Security?brand=matos-account&amp;handler=Confirm", scan);
+        AssertNoIdentity(scan);
+
+        // The sign-in password, as MatOS's tab Password links it.
+        var password = await browser.GetStringAsync("/Account/Profile?tab=password&brand=matos-account");
+        Assert.Contains("data-app=\"brand\"", password);
+        Assert.Contains("Change password", password);
+        AssertNoIdentity(password);
+
+        // MatIdentity's own account stays its own: without ?brand (the cookie of a branded sign-in names none here), for an app without a look, for an unknown id.
+        AssertMatIdentity(await browser.GetStringAsync("/Account/Security"));
+        AssertMatIdentity(await browser.GetStringAsync("/Account/Security?brand=plain-account"));
+        AssertMatIdentity(await browser.GetStringAsync("/Account/Profile?brand=nobody-here"));
+        var cookieOnly = new HttpRequestMessage(HttpMethod.Get, "/Account/Profile");
+        cookieOnly.Headers.Add("Cookie", "mid.brand=matos-account");
+        var shell = await (await browser.SendAsync(cookieOnly)).Content.ReadAsStringAsync();
+        Assert.Contains("mat-nav", shell);
+        Assert.DoesNotContain("mi-brand", shell);
+    }
+
     private async Task<string> CreatePersonAsync(string username, bool mustChange)
     {
         using var scope = _site.Services.CreateScope();

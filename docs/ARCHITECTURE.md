@@ -178,7 +178,14 @@ every other app in without a password: single sign-on stays.
   the app when it hides MatIdentity and its link carries `&brand=`. MatOS sends its own client id.
 - **The forced password change.** `PasswordChangeGuardMiddleware` sends a person who must change their password to `/Account/ChangePassword`: with a brand a step of the
   sign-in in its look, without one it hands over to the password tab of the account, as before.
-- **Not branded:** the account pages, Setup, invitations sent by an administrator in the UI.
+- **The account from a link of the app.** `/Account/Profile` and `/Account/Security` take a brand only when the link names it (`?brand=<clientId>`,
+  `SignInBranding.AccountBrandAsync`), never from the cookie of a sign-in: MatOS links its person's sign-in password and second step there
+  (`/Account/Security?brand=<its client id>`, in a new tab: a passkey cannot be made in a frame without `allow="publickey-credentials-create"`). Then the layout is
+  `_BrandedAccount`: the app's head (`_BrandHead`, shared with `_SignIn`), a bar with its name and *Back to <app>* (its `homeUrl`), the page on the calm gradient of its
+  accent (no picture: the title stands on it) with the tabs of the account and without MatIdentity's menu; every tab, link, form and redirect keeps `brand`. With
+  `hideIdentity` the page says the app asks for the code, and the authenticator app shows the app's name as the issuer. Without `brand` (or with the id of an app
+  without a look) the same addresses are MatIdentity's own account, as before.
+- **Not branded:** Setup, invitations sent by an administrator in the UI, MatIdentity's own account (no `?brand`).
 
 ## Sign-out reaches the apps
 

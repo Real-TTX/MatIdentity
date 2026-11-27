@@ -84,3 +84,23 @@
 .mi-brand-logo img { object-fit: contain; }
 /* No logo: the first letters of the name on the accent. */
 .mi-brand-mark { font-size: var(--mat-fs-lg); font-weight: 700; letter-spacing: .02em; }
+.mi-brand-mark--sm { font-size: var(--mat-fs-sm); }
+
+/* ---- The account in the look of an app (_BrandedAccount): the calm gradient from its accent (no picture: the title stands on it), a bar with the app, the page ---- */
+.mi-brand-page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(120% 90% at 15% 0%, color-mix(in oklab, var(--mat-accent) 22%, var(--mat-bg)), transparent 70%),
+    linear-gradient(160deg, color-mix(in oklab, var(--mat-accent) 10%, var(--mat-bg)), var(--mat-bg));
+  background-attachment: fixed;
+}
+.mi-brand-bar {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: var(--mat-space-3);
+  width: 100%; max-width: 780px; margin: 0 auto;
+  padding: var(--mat-space-4) var(--mat-content-pad) 0;
+}
+.mi-brand-bar__name { display: inline-flex; align-items: center; gap: var(--mat-space-3); min-width: 0; font-weight: 650; }

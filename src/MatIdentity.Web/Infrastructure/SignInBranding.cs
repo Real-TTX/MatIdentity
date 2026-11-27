@@ -74,6 +74,29 @@ public static class SignInBranding
         return brand;
     }
 
+    /// <summary>The pages of the account that take a brand when a link names it (<see cref="AccountBrandAsync"/>).</summary>
+    public static readonly IReadOnlyList<string> AccountPages = ["/Account/Profile", "/Account/Security"];
+
+    private static readonly object AccountItemKey = new();
+
+    /// <summary>
+    /// The brand of a page of the account (<see cref="AccountPages"/>), or null: only the <c>?brand=&lt;clientId&gt;</c> of the request names it (a broker's link to its
+    /// person's password or second step, e.g. MatOS's tab Security), never the cookie of a sign-in, so MatIdentity's own account stays its own. The pages carry the
+    /// <c>brand</c> on in their links, forms and redirects. A brand is looked up only for the id of a registered app with a look.
+    /// </summary>
+    public static async Task<SignInBrand?> AccountBrandAsync(HttpContext http)
+    {
+        ArgumentNullException.ThrowIfNull(http);
+        if (http.Items.TryGetValue(AccountItemKey, out var known))
+        {
+            return known as SignInBrand;
+        }
+
+        var brand = await LookUpAsync(http, http.Request.Query[QueryKey].ToString());
+        http.Items[AccountItemKey] = brand;
+        return brand;
+    }
+
     /// <summary>The brand of this request when it is known already (the layout, after <see cref="ResolveAsync"/>).</summary>
     public static SignInBrand? Current(HttpContext http) => http.Items.TryGetValue(ItemKey, out var known) ? known as SignInBrand : null;
 

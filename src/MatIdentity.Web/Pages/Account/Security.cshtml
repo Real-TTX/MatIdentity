@@ -5,6 +5,11 @@
     ViewData["PageSub"] = "Who you are in all Mat apps, your password, the second step and your devices.";
     ViewData["Crumbs"] = Crumbs.Of(("Account", "/Account/Profile"), ("Security", null));
     ViewData["Width"] = "narrow";
+    if (Model.Brand is not null)
+    {
+        // Opened from the link of an app with a brand (MatOS's tab Security): in its look, without MatIdentity's menu.
+        Layout = "_BrandedAccount";
+    }
 }
 
 <tab-bar model="Model.Tabs" label="Account" />
@@ -23,7 +28,7 @@
             <pre class="mat-code mi-codes" id="recovery-codes">@string.Join("\n", Model.NewRecoveryCodes)</pre>
             <div class="mat-btn-row mat-btn-row--plain">
                 <button type="button" class="mat-btn mat-btn--primary" data-copy="#recovery-codes"><icon name="copy" /><span>Copy the codes</span></button>
-                <a class="mat-btn mat-btn--secondary" href="/Account/Security"><icon name="check" /><span>Done</span></a>
+                <a class="mat-btn mat-btn--secondary" href="@Model.SelfUrl"><icon name="check" /><span>Done</span></a>
             </div>
         </div>
     </div>
@@ -35,15 +40,15 @@ else
         <div class="mat-card__body mat-stack">
             @if (Model.Me.TotpEnabled)
             {
-                <p><span class="mat-pill mat-pill--ok">On</span> After your password, MatIdentity asks for the code of your app. @Model.RecoveryCodesLeft recovery codes are left.</p>
+                <p><span class="mat-pill mat-pill--ok">On</span> After your password, @Model.SignInName asks for the code of your app. @Model.RecoveryCodesLeft recovery codes are left.</p>
                 <form method="post" class="mat-form" novalidate>
                     <mat-field label="Your password" for-id="sec-password" hint="To turn the app off or to make new recovery codes.">
                         <input type="password" id="sec-password" name="password" class="mat-input" autocomplete="current-password" required data-msg-required="Please enter your password." />
                     </mat-field>
                     <div class="mat-btn-row">
-                        <button type="submit" class="mat-btn mat-btn--secondary" asp-page-handler="RenewCodes"><icon name="refresh" /><span>New recovery codes</span></button>
+                        <button type="submit" class="mat-btn mat-btn--secondary" asp-page-handler="RenewCodes" asp-route-brand="@Model.BrandId"><icon name="refresh" /><span>New recovery codes</span></button>
                         <span class="mat-btn-row__spacer"></span>
-                        <button type="submit" class="mat-btn mat-btn--danger mat-btn--end" asp-page-handler="Disable" data-confirm="Turn the authenticator app off? Your password alone then signs you in, unless you have a passkey." data-confirm-ok="Turn off" data-confirm-danger><icon name="x" /><span>Turn off</span></button>
+                        <button type="submit" class="mat-btn mat-btn--danger mat-btn--end" asp-page-handler="Disable" asp-route-brand="@Model.BrandId" data-confirm="Turn the authenticator app off? Your password alone then signs you in, unless you have a passkey." data-confirm-ok="Turn off" data-confirm-danger><icon name="x" /><span>Turn off</span></button>
                     </div>
                 </form>
             }
@@ -52,20 +57,20 @@ else
                 <p>Scan the code with your authenticator app (Microsoft Authenticator, Google Authenticator, 1Password, Bitwarden, ...), then enter the code it shows.</p>
                 <div class="mi-qr"><img src="@Model.SetupQr" alt="QR code for your authenticator app" width="240" height="240" /></div>
                 <p class="mat-hint">Cannot scan? Type this key into the app: <span class="mat-mono">@MatIdentity.Web.Pages.Account.SecurityModel.Grouped(Model.SetupSecret)</span></p>
-                <form method="post" asp-page-handler="Confirm" class="mat-form" novalidate>
+                <form method="post" asp-page-handler="Confirm" asp-route-brand="@Model.BrandId" class="mat-form" novalidate>
                     <mat-field label="Code from the app" for-id="sec-code">
                         <input id="sec-code" name="code" class="mat-input mat-mono" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9 ]{6,7}" required autofocus data-msg-required="Please enter the code." data-msg-pattern="Six digits." />
                     </mat-field>
                     <div class="mat-btn-row">
                         <button type="submit" class="mat-btn mat-btn--primary"><icon name="check" /><span>Turn on</span></button>
-                        <a href="/Account/Security" class="mat-btn mat-btn--secondary"><icon name="back" /><span>Back</span></a>
+                        <a href="@Model.SelfUrl" class="mat-btn mat-btn--secondary"><icon name="back" /><span>Back</span></a>
                     </div>
                 </form>
             }
             else
             {
                 <p class="mat-muted">Optional. With an app on your phone a stolen password is not enough to sign in as you.</p>
-                <form method="post" asp-page-handler="Begin">
+                <form method="post" asp-page-handler="Begin" asp-route-brand="@Model.BrandId">
                     <button type="submit" class="mat-btn mat-btn--primary"><icon name="plus" /><span>Set up an authenticator app</span></button>
                 </form>
             }
@@ -91,7 +96,7 @@ else
                                     <td data-label="Last used" class="mat-nowrap">@(p.LastUsedAt is { } used ? Format.Ago(used) : "never")</td>
                                     <td class="mat-table__cell-actions">
                                         <div class="mat-table__actions">
-                                            <form method="post" asp-page-handler="DeletePasskey" data-confirm="Remove the passkey @p.Name? Delete it on the device too." data-confirm-ok="Remove" data-confirm-danger>
+                                            <form method="post" asp-page-handler="DeletePasskey" asp-route-brand="@Model.BrandId" data-confirm="Remove the passkey @p.Name? Delete it on the device too." data-confirm-ok="Remove" data-confirm-danger>
                                                 <input type="hidden" name="id" value="@p.Id" />
                                                 <button type="submit" class="mat-btn mat-btn--danger mat-btn--icon mat-btn--sm" aria-label="Remove @p.Name" data-tip="Remove"><icon name="trash" /></button>
                                             </form>

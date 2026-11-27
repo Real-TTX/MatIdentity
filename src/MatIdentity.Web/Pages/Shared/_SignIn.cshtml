@@ -9,7 +9,6 @@
         Layout = "_Bare";
     }
 
-    var title = ViewData["Title"] as string;
     var theme = User.Identity?.IsAuthenticated == true ? User.GetTheme() : "system";
 }
 @if (brand is null)
@@ -20,23 +19,7 @@ else
 {
 <!DOCTYPE html>
 <html lang="en" data-app="brand" @(theme is "light" or "dark" ? Html.Raw($"data-theme=\"{theme}\"") : null)>
-<head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="color-scheme" content="light dark" />
-    @if (brand.Info.Accent is { } accent)
-    {
-        <meta name="theme-color" content="@accent" />
-    }
-    <title>@(string.IsNullOrEmpty(title) ? brand.Name : $"{title} · {brand.Name}")</title>
-    <link rel="icon" href="@brand.IconUrl" type="@brand.IconType" />
-    <meta name="application-name" content="@brand.Name" />
-    <meta name="apple-mobile-web-app-title" content="@brand.Name" />
-    <script src="~/matui/matui.boot.js" asp-append-version="true"></script>
-    <link rel="stylesheet" href="~/matui/matui.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/css/matidentity.css" asp-append-version="true" />
-    <link rel="stylesheet" href="@brand.ThemeUrl" />
-</head>
+<partial name="_BrandHead" model="brand" />
 <body>
     <a class="mat-skip" href="#main">Skip to the content</a>
     @Html.Raw(Toolkit.Sprite)

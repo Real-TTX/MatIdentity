@@ -6,6 +6,7 @@ using MatIdentity.Core.Entities;
 using MatIdentity.Core.Security;
 using MatIdentity.Core.Users;
 using MatIdentity.Web.Controls;
+using MatIdentity.Web.Infrastructure;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -66,19 +67,29 @@ public class ProfileModel : PageModel
     /// <summary>general, password or sessions; the password tab when a change is required or the last submit failed.</summary>
     public string ActiveTab => MustChange || Tab == "password" || !ModelState.IsValid ? "password" : Tab == "sessions" ? "sessions" : "general";
 
-    public TabBarModel Tabs => TabsFor(ActiveTab);
+    public TabBarModel Tabs => TabsFor(ActiveTab, BrandId);
 
-    /// <summary>The tabs of the account (this page and the security page).</summary>
-    public static TabBarModel TabsFor(string active) => new()
+    /// <summary>The look of the app whose link opened the account (SignInBranding.AccountBrandAsync), or null: MatIdentity's own account.</summary>
+    public SignInBrand? Brand { get; private set; }
+
+    /// <summary>The client id the links, forms and redirects of the page carry on (<c>?brand=</c>), or null.</summary>
+    public string? BrandId => Brand?.ClientId;
+
+    /// <summary>The tabs of the account (this page and the security page); in the look of an app they keep its <paramref name="brandId"/>.</summary>
+    public static TabBarModel TabsFor(string active, string? brandId = null) => new()
     {
         Tabs =
         [
-            new TabItem { Title = "General", Href = "/Account/Profile", Icon = "user", Active = active == "general" },
-            new TabItem { Title = "Password", Href = "/Account/Profile?tab=password", Icon = "key", Active = active == "password" },
-            new TabItem { Title = "Security", Href = "/Account/Security", Icon = "shield", Active = active == "security" },
-            new TabItem { Title = "Devices", Href = "/Account/Profile?tab=sessions", Icon = "monitor", Active = active == "sessions" },
+            new TabItem { Title = "General", Href = AccountUrl("/Account/Profile", brandId), Icon = "user", Active = active == "general" },
+            new TabItem { Title = "Password", Href = AccountUrl("/Account/Profile?tab=password", brandId), Icon = "key", Active = active == "password" },
+            new TabItem { Title = "Security", Href = AccountUrl("/Account/Security", brandId), Icon = "shield", Active = active == "security" },
+            new TabItem { Title = "Devices", Href = AccountUrl("/Account/Profile?tab=sessions", brandId), Icon = "monitor", Active = active == "sessions" },
         ],
     };
+
+    /// <summary>A page of the account, with the <c>brand</c> of the app whose look it keeps (none: the address as it is).</summary>
+    public static string AccountUrl(string path, string? brandId)
+        => string.IsNullOrEmpty(brandId) ? path : path + (path.Contains('?', StringComparison.Ordinal) ? "&" : "?") + "brand=" + Uri.EscapeDataString(brandId);
 
     public class InputModel
     {
@@ -140,11 +151,12 @@ public class ProfileModel : PageModel
         await SignInFlow.RenewCookieAsync(HttpContext, user);
 
         StatusMessage = "Password changed. You are signed out on your other devices.";
-        return !string.IsNullOrEmpty(ReturnUrl) && Url.IsLocalUrl(ReturnUrl) ? LocalRedirect(ReturnUrl) : RedirectToPage();
+        return !string.IsNullOrEmpty(ReturnUrl) && Url.IsLocalUrl(ReturnUrl) ? LocalRedirect(ReturnUrl) : RedirectToPage(new { brand = BrandId });
     }
 
     public async Task<IActionResult> OnPostSignOutOthersAsync()
     {
+        Brand = await SignInBranding.AccountBrandAsync(HttpContext);
         if (User.GetUserId() is not { } userId || await _userService.GetAsync(userId, HttpContext.RequestAborted) is not { } user)
         {
             return Forbid();
@@ -153,12 +165,13 @@ public class ProfileModel : PageModel
         var count = await _sessions.InvalidateAllAsync(userId, exceptToken: CurrentToken, HttpContext.RequestAborted);
         await _revoker.RevokeForSubjectAsync(user.Subject, HttpContext.RequestAborted);
         StatusMessage = count == 1 ? "Signed out on 1 other device." : $"Signed out on {count} other devices.";
-        return RedirectToPage(new { tab = "sessions" });
+        return RedirectToPage(new { tab = "sessions", brand = BrandId });
     }
 
     /// <summary>A link to the address of the account; following it confirms the address.</summary>
     public async Task<IActionResult> OnPostSendVerificationAsync()
     {
+        Brand = await SignInBranding.AccountBrandAsync(HttpContext);
         if (User.GetUserId() is not { } userId || await _userService.GetAsync(userId, HttpContext.RequestAborted) is not { } user)
         {
             return Forbid();
@@ -168,11 +181,12 @@ public class ProfileModel : PageModel
         StatusMessage = await _accounts.SendVerificationAsync(user, linkBase, ct: HttpContext.RequestAborted)
             ? $"A link is on its way to {user.Email}. It works for 48 hours."
             : "No mail could be sent.";
-        return RedirectToPage();
+        return RedirectToPage(new { brand = BrandId });
     }
 
     private async Task<bool> LoadAsync()
     {
+        Brand = await SignInBranding.AccountBrandAsync(HttpContext);
         var userId = User.GetUserId();
         if (userId is null)
         {

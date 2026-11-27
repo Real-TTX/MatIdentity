@@ -4,6 +4,7 @@ using MatIdentity.Core.Entities;
 using MatIdentity.Core.Security;
 using MatIdentity.Core.Users;
 using MatIdentity.Web.Controls;
+using MatIdentity.Web.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using QRCoder;
@@ -50,7 +51,19 @@ public class SecurityModel : PageModel
 
     [TempData] public string? StatusMessage { get; set; }
 
-    public TabBarModel Tabs => ProfileModel.TabsFor("security");
+    public TabBarModel Tabs => ProfileModel.TabsFor("security", BrandId);
+
+    /// <summary>The look of the app whose link opened the page (SignInBranding.AccountBrandAsync; MatOS's tab Security), or null: MatIdentity's own account.</summary>
+    public SignInBrand? Brand { get; private set; }
+
+    /// <summary>The client id the links, forms and redirects of the page carry on (<c>?brand=</c>), or null.</summary>
+    public string? BrandId => Brand?.ClientId;
+
+    /// <summary>This page with its brand.</summary>
+    public string SelfUrl => ProfileModel.AccountUrl("/Account/Security", BrandId);
+
+    /// <summary>Who asks for the code at the sign-in, in the words of the page: the app when its look hides MatIdentity, else MatIdentity.</summary>
+    public string SignInName => Brand is { HideIdentity: true } brand ? brand.Name : "MatIdentity";
 
     public async Task<IActionResult> OnGetAsync(bool setup = false)
     {
@@ -71,11 +84,11 @@ public class SecurityModel : PageModel
     {
         if (!await LoadAsync() || Me.TotpEnabled)
         {
-            return RedirectToPage();
+            return RedirectToPage(new { brand = BrandId });
         }
 
         await _twoFactor.BeginSetupAsync(Me.Id, HttpContext.RequestAborted);
-        return RedirectToPage(new { setup = true });
+        return RedirectToPage(new { setup = true, brand = BrandId });
     }
 
     public async Task<IActionResult> OnPostConfirmAsync(string? code)
@@ -113,7 +126,7 @@ public class SecurityModel : PageModel
 
         await _twoFactor.DisableAsync(Me.Id, HttpContext.RequestAborted);
         StatusMessage = "The authenticator app is off.";
-        return RedirectToPage();
+        return RedirectToPage(new { brand = BrandId });
     }
 
     public async Task<IActionResult> OnPostRenewCodesAsync(string? password)
@@ -146,7 +159,7 @@ public class SecurityModel : PageModel
             StatusMessage = $"The passkey \"{name}\" is removed.";
         }
 
-        return RedirectToPage();
+        return RedirectToPage(new { brand = BrandId });
     }
 
     private async Task ShowSetupAsync(string? secret)
@@ -157,7 +170,8 @@ public class SecurityModel : PageModel
         }
 
         SetupSecret = secret;
-        var issuer = (await _config.GetAsync(HttpContext.RequestAborted)).InstanceName;
+        // The name the authenticator app shows: the app when its look hides MatIdentity (the person knows only it), else the name of this MatIdentity.
+        var issuer = Brand is { HideIdentity: true } brand ? brand.Name : (await _config.GetAsync(HttpContext.RequestAborted)).InstanceName;
         using var generator = new QRCodeGenerator();
         using var data = generator.CreateQrCode(Totp.KeyUri(issuer, Me.Username, secret), QRCodeGenerator.ECCLevel.M);
         var svg = new SvgQRCode(data).GetGraphic(6);
@@ -169,6 +183,7 @@ public class SecurityModel : PageModel
 
     private async Task<bool> LoadAsync()
     {
+        Brand = await SignInBranding.AccountBrandAsync(HttpContext);
         if (User.GetUserId() is not { } id || await _users.GetAsync(id, HttpContext.RequestAborted) is not { } user)
         {
             return false;
